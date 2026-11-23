@@ -881,7 +881,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8.4';
+var APP_VER='1.8.5';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -1613,6 +1613,7 @@ function kaptGet(){
   box.innerHTML='<p class="muted">K-apt에서 가져오는 중입니다…</p>';
   fetch(api+'/api/info?code='+encodeURIComponent(code)).then(function(r){return r.json();}).then(function(j){
     if(!j||!j.ok){box.innerHTML='<p class="note">K-apt에서 이 단지 정보를 찾지 못했습니다. 단지코드를 확인해 주세요.'+(j&&j.error?' ('+esc(j.error)+')':'')+'</p>';return;}
+    if(j.basic&&j.basic.bjdCode){state.kapt.bjd=String(j.basic.bjdCode);state.kapt.bjdOf=String(code).trim().toUpperCase();saveNow();}
     var m=kaptMap(j.basic,j.detail);kaptRows=m.rows;kaptRegion=regionOf((j.basic&&(j.basic.doroJuso||j.basic.kaptAddr))||'');
     if(!m.rows.length){box.innerHTML='<p class="note">정보는 받았지만 넣을 수 있는 항목이 없습니다.</p>';return;}
     var diff=m.rows.filter(function(r){return r.cur&&!r.same;}).length;
@@ -2893,6 +2894,7 @@ function bdKapt(){
   fetch(kapiBase()+'/api/info?code='+code).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'없음');
     var A={};[j.basic,j.detail].forEach(function(o){Object.keys(o||{}).forEach(function(x){A[x]=o[x];});});
+    if(A.bjdCode){state.kapt.bjd=String(A.bjdCode);state.kapt.bjdOf=code;}
     var b=BQ(),set=function(path,val){if(!val)return;var p=path.split('.'),o=b;for(var i=0;i<p.length-1;i++)o=o[p[i]];if(!String(o[p[p.length-1]]||'').trim())o[p[p.length-1]]=val;};
     set('addr',kg(A,['doroJuso','kaptAddr']));var dc=kg(A,['kaptDongCnt']);if(dc)set('dongs',dc+'개동');
     var ta=kg(A,['kaptTarea']);if(ta)set('cx.tarea',kNum(ta));var ma=kg(A,['kaptMarea']);if(ma)set('cx.marea',kNum(ma));
@@ -2945,7 +2947,7 @@ function bdAwards(){
   var unit=b.kind==='elev'?'elev':'hh';
   var code=kcode();if(!/^A\d{8}$/.test(code)){box.innerHTML='<p class="note">홈의 "K-apt에서 가져오기"에 우리 단지코드를 먼저 넣으세요. 같은 시·군·구 단지를 찾는 데 씁니다.</p>';return;}
   box.innerHTML='<p class="muted">같은 시·군·구 단지들의 같은 업종 계약·낙찰 금액을 찾는 중입니다 (10~20초)…</p>';
-  fetch(kapiBase()+'/api/awards?code='+code+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+(AFILT[b.kind]&&AFILT[b.kind].inc?'&inc='+encodeURIComponent(AFILT[b.kind].inc):'')+(AFILT[b.kind]&&AFILT[b.kind].ex?'&ex='+encodeURIComponent(AFILT[b.kind].ex):'')+'&unit='+unit).then(function(r){return r.json();}).then(function(j){
+  fetch(kapiBase()+'/api/awards?code='+code+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+(AFILT[b.kind]&&AFILT[b.kind].inc?'&inc='+encodeURIComponent(AFILT[b.kind].inc):'')+(AFILT[b.kind]&&AFILT[b.kind].ex?'&ex='+encodeURIComponent(AFILT[b.kind].ex):'')+'&unit='+unit+(/^\d{10}$/.test(String(state.kapt.bjd||''))&&state.kapt.bjdOf===code?'&bjd='+state.kapt.bjd:'')).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'없음');
     if(!j.area||/^\d+$/.test(j.area))j.area='같은 시·군·구';
     var L=j.list.filter(function(x){return !/테스트|test/i.test(x.t);});
