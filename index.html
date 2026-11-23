@@ -881,7 +881,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8.5';
+var APP_VER='1.8.6';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2941,6 +2941,23 @@ function bdNear(){
   }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
 }
 function median(a){a=a.filter(function(x){return x>0;}).sort(function(x,y){return x-y;});if(!a.length)return 0;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
+/* 인근 비교: 세대수·승강기 대수는 한 번 받으면 이 기기에 기억 (K-apt 기본정보가 자주 비어서) */
+var bdAwJ=null,bdFilling=false;
+function unitCache(){try{return JSON.parse(localStorage.getItem('gy_units')||'{}')||{};}catch(e){return {};}}
+function unitPut(code,hh,ev){try{var C=unitCache(),o=C[code]||{};if(hh)o.hh=hh;if(ev)o.ev=ev;C[code]=o;localStorage.setItem('gy_units',JSON.stringify(C));}catch(e){}}
+function fillUnits(){
+  if(!bdAwJ||bdFilling)return;var J=bdAwJ,key=J.unit==='elev'?'ev':'hh';
+  var need=J.j.list.filter(function(x){return !x[key]&&!x.tried;});if(!need.length)return;
+  bdFilling=true;paintAw();
+  var i=0,next=function(){
+    if(bdAwJ!==J||i>=need.length){bdFilling=false;if(bdAwJ===J)paintAw();return;}
+    var x=need[i++];x.tried=1;
+    fetch(kapiBase()+'/api/info?code='+x.code).then(function(r){return r.json();}).then(function(r){
+      var hh=+(r.basic&&(r.basic.kaptdaCnt||r.basic.hoCnt))||0,ev=+(r.detail&&r.detail.kaptdEcnt)||0;
+      if(hh&&!x.hh)x.hh=hh;if(ev&&!x.ev)x.ev=ev;unitPut(x.code,hh,ev);
+    }).catch(function(){}).then(function(){if(bdAwJ===J)paintAw();next();});
+  };next();
+}
 function bdAwards(){
   var box=$('#bd-near'),b=BQ(),k=BD.kind(b.kind),cl=KCLS[b.kind]||[];if(!box)return;
   var kw=cl[2]?'':bidName().replace(/\s*(용역|공사|계약|선정)\s*/g,' ').trim().split(/\s+/)[0]||'';
@@ -2950,7 +2967,15 @@ function bdAwards(){
   fetch(kapiBase()+'/api/awards?code='+code+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+(AFILT[b.kind]&&AFILT[b.kind].inc?'&inc='+encodeURIComponent(AFILT[b.kind].inc):'')+(AFILT[b.kind]&&AFILT[b.kind].ex?'&ex='+encodeURIComponent(AFILT[b.kind].ex):'')+'&unit='+unit+(/^\d{10}$/.test(String(state.kapt.bjd||''))&&state.kapt.bjdOf===code?'&bjd='+state.kapt.bjd:'')).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'없음');
     if(!j.area||/^\d+$/.test(j.area))j.area='같은 시·군·구';
-    var L=j.list.filter(function(x){return !/테스트|test/i.test(x.t);});
+    j.list=j.list.filter(function(x){return !/테스트|test/i.test(x.t);});
+    var C=unitCache();j.list.forEach(function(x){var c=C[x.code];if(c){if(!x.hh&&c.hh)x.hh=c.hh;if(!x.ev&&c.ev)x.ev=c.ev;}if(x.hh||x.ev)unitPut(x.code,x.hh,x.ev);});
+    bdAwJ={j:j,unit:unit};paintAw();fillUnits();
+  }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
+}
+function paintAw(){
+  var box=$('#bd-near'),b=BQ(),k=BD.kind(b.kind);if(!box||!bdAwJ)return;
+  var j=bdAwJ.j,unit=bdAwJ.unit,L=j.list;
+
     if(!L.length){box.innerHTML='<p class="note">'+esc(j.area||'')+' 단지 '+j.searched+'곳(전체 '+j.inArea+'곳 중 같은 동 우선)의 최근 4년 계약·낙찰에서 같은 업종 사례를 찾지 못했습니다.</p>';return;}
     var svc=k.g==='용역'||k.g==='관리업자';
     L.forEach(function(x){var ok=/^\d{4}-\d{2}-\d{2}$/.test(x.s)&&/^\d{4}-\d{2}-\d{2}$/.test(x.e);var mo=ok?Math.max(1,Math.round((BD.diff(x.s,x.e)+1)/30.44)):0;x.mo=mo;x.mon=svc&&mo>=2?x.amt/mo:0;var u=unit==='elev'?x.ev:x.hh;x.u=u;x.per=x.mon&&u?x.mon/u:0;});
@@ -2965,8 +2990,8 @@ function bdAwards(){
       (svc&&ourPer?'<br>우리 예정 금액: '+uName+'당 월 '+won(ourPer)+(cmp!==null?' → 중간값보다 <b>'+(cmp>=0?cmp+'% 높음':(-cmp)+'% 낮음')+'</b>':''):(svc&&mPer?'<br><span class="muted">예정 금액과 '+(unit==='elev'?'④의 승강기 대수':'홈의 세대수')+'를 넣으면 비교합니다.</span>':''))+'</div>'+
       '<div style="overflow-x:auto;margin-top:.4rem"><table class="kt nw"><thead><tr><th>구분</th><th>단지</th><th>계약명</th><th>금액</th><th>기간</th><th>'+(unit==='elev'?'대수':'세대')+'</th>'+(svc?'<th>'+uName+'당 월</th>':'')+'</tr></thead><tbody>'+
       L.sort(function(a,z){return z.per-a.per||z.amt-a.amt;}).map(function(x){return '<tr><td><span class="tag '+(x.src==='낙찰'?'on':'link')+'">'+esc(x.src)+'</span></td><td>'+esc(x.apt)+'<br><small class="muted">'+esc(x.dong||'')+' · '+esc(String(x.reg||'').slice(0,10))+'</small></td><td>'+esc(cut(x.t,22))+(x.suc?'<br><small class="muted">'+esc(SUCW[x.suc]||'')+'</small>':'')+'</td><td style="text-align:right">'+x.amt.toLocaleString('ko-KR')+'</td><td>'+(x.mo?x.mo+'개월':'')+'</td><td>'+(x.u||'')+'</td>'+(svc?'<td style="text-align:right">'+(x.per?won(x.per):'')+'</td>':'')+'</tr>';}).join('')+'</tbody></table></div>'+
-      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료: 같은 시·군·구 단지(같은 동 먼저, 최대 13곳)의 최근 4년 수의계약 공지와 입찰결과 중 같은 업종 가장 최근 1건씩. 용역 금액은 계약기간 전체 금액으로 보고 개월 수로 나눴습니다(지침 제28조제2항). 단지에 따라 월 금액으로 등록한 경우가 있어 지나치게 낮은 값은 빼고 보세요. 유지관리 방식(POG/FM)·인원·근무형태 차이도 감안하세요.</p>';
-  }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
+      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료: 같은 시·군·구 단지(같은 동 먼저, 최대 13곳)의 최근 4년 수의계약 공지와 입찰결과 중 같은 업종 가장 최근 1건씩. 용역 금액은 계약기간 전체 금액으로 보고 개월 수로 나눴습니다(지침 제28조제2항). 단지에 따라 월 금액으로 등록한 경우가 있어 지나치게 낮은 값은 빼고 보세요. 유지관리 방식(POG/FM)·인원·근무형태 차이도 감안하세요.</p>'+
+      '<p class="muted" id="bd-fill" style="font-size:.8rem;margin:.2rem 0 0">'+(bdFilling?(unit==='elev'?'승강기 대수':'세대수')+' 빈 칸을 K-apt에서 다시 찾는 중…':'')+'</p>';
 }
 function bdAct(act,a){
   if(bdExAct(act,a))return true;
