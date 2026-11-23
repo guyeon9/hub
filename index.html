@@ -881,7 +881,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8';
+var APP_VER='1.8.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2288,7 +2288,7 @@ function evalDefault(kind){
 function bidDefault(){return {kind:'elev',name:'',path:'auto',sui:[],amt:'',amtMode:'month',months:'24',type:'일반경쟁',award:'',ekapt:true,site:false,siteDate:'',siteTime:'14:00',siteMust:true,urgent:false,rebid:false,
   boardDate:'',noticeDate:'',dueDate:'',dueTime:'17:00',openDate:'',openTime:'10:00',place:'관리사무소',decDate:'',conDate:'',start:'',end:'',
   addr:'',dongs:'',outline:'',qual:'',limitTxt:'',calc:'',special:'',defectRate:'',cap:'',capBasis:'',tel:'',noticeNo:'',holidays:'',vote:false,
-  cx:{tarea:'',marea:'',heat:'',usedate:'',fax:'',office:''},agent:'',pay:'',acct:'',conVat:'포함',bizno:'',proxy:true,
+  cx:{tarea:'',marea:'',heat:'',usedate:'',fax:'',office:'',ev:''},agent:'',pay:'',acct:'',conVat:'포함',bizno:'',proxy:true,
   pt:{on:false,date:'',time:'10:00',min:'10',copies:'6'},tech:'',equip:'',evalOn:false,eval:null,staff:[],cos:[],
   wage:{hourly:'10700',pension:'5.0',health:'3.595',ltc:'13.90',emp:'1.15',acc:'',annual:true,uniform:'12000',supplies:'4000',edu:'5000',check:'3000',mgmt:'1',profit:'1'},
   win:{name:'',addr:'',ceo:'',tel:'',bizno:'',amt:'',period:'',eval:''},ui:{doc:'judge'}};}
@@ -2357,7 +2357,7 @@ function renderBid(v){
     CHK('낙찰방법을 입주민투표로 정함 (규약 대상 금액 이상)',BP('vote'),b.vote,{wide:1})+
    '</div>')+
   '<div id="bd-judge" style="margin-top:.8rem"></div>'+
-  '<div class="row" style="margin-top:.8rem"><button type="button" class="btn ghost" data-act="bdagenda">안건·공고에 의결 안건 넣기</button><button type="button" class="btn ghost" data-act="bdnear">같은 업종 최근 공고 보기</button></div><div id="bd-near" style="margin-top:.5rem"></div></section>'+
+  '<div class="row" style="margin-top:.8rem"><button type="button" class="btn ghost" data-act="bdagenda">안건·공고에 의결 안건 넣기</button><button type="button" class="btn ghost" data-act="bdnear">같은 업종 최근 공고 보기</button><button type="button" class="btn ghost" data-act="bdaward">같은 업종 낙찰가 보기</button></div><div id="bd-near" style="margin-top:.5rem"></div></section>'+
   '<section class="card"><h2>③ 일정</h2><div class="grid2">'+
     F('입대의 의결일',BP('boardDate'),b.boardDate,{type:'date'})+
     (sui?F('계약상대자 결정일',BP('decDate'),b.decDate,{type:'date',hint:'비우면 의결일로 봅니다.'})+F('계약 체결일',BP('conDate'),b.conDate,{type:'date'})
@@ -2375,7 +2375,7 @@ function renderBid(v){
     F('동수',BP('dongs'),b.dongs,{ph:'예: 3개동'})+F('연면적 (㎡)',BP('cx.tarea'),b.cx.tarea)+
     F('관리비 부과면적 (㎡)',BP('cx.marea'),b.cx.marea)+F('난방방식',BP('cx.heat'),b.cx.heat)+
     F('사용검사일',BP('cx.usedate'),b.cx.usedate,{ph:'예: 1998. 3. 28.'})+F('관리사무소 전화',BP('tel'),b.tel,{ph:'032-000-0000'})+
-    F('팩스',BP('cx.fax'),b.cx.fax)+F('관리사무소 주소 (다르면)',BP('cx.office'),b.cx.office)+
+    F('팩스',BP('cx.fax'),b.cx.fax)+(b.kind==='elev'?F('승강기 대수',BP('cx.ev'),b.cx.ev||'',{hint:'낙찰가 비교(대당 금액)에 씁니다'}):'')+F('관리사무소 주소 (다르면)',BP('cx.office'),b.cx.office)+
   '</div><div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-act="bdkapt">K-apt에서 단지 현황 가져오기</button><span class="muted" id="bd-kmsg" style="font-size:.82rem"></span></div></section>'+
   '<section class="card"><h2>⑤ 사업 개요 <small>업종별 틀이 있습니다</small></h2>'+
     F('사업 개요 (내용·규모·면적 등)',BP('outline'),b.outline,{area:1,rows:6,wide:1,ph:OUTLINE[b.kind]||'사업 내용·규모·면적 등'})+
@@ -2800,7 +2800,7 @@ function bdKapt(){
     var ta=kg(A,['kaptTarea']);if(ta)set('cx.tarea',kNum(ta));var ma=kg(A,['kaptMarea']);if(ma)set('cx.marea',kNum(ma));
     set('cx.heat',kg(A,['codeHeatNm']));var ud=kg(A,['kaptUsedate']);if(ud)set('cx.usedate',kDate(ud));
     set('tel',kg(A,['kaptTel']));set('cx.fax',kg(A,['kaptFax']));
-    var ec=kg(A,['kaptdEcnt']);if(ec&&b.kind==='elev'&&!b.outline)b.outline=OUTLINE.elev.replace('승강기 ○대','승강기 '+ec+'대');
+    var ec=kg(A,['kaptdEcnt']);if(ec)set('cx.ev',ec);if(ec&&b.kind==='elev'&&!b.outline)b.outline=OUTLINE.elev.replace('승강기 ○대','승강기 '+ec+'대');
     saveNow();var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);var m2=$('#bd-kmsg');if(m2)m2.textContent='K-apt 값을 빈 칸에 넣었습니다. 실제와 맞는지 확인하세요.';
   }).catch(function(e){var m2=$('#bd-kmsg');if(m2)m2.textContent=/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+e.message;});
 }
@@ -2840,6 +2840,32 @@ function bdNear(){
       '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료(국토교통부 공동주택 입찰공고 정보). 낙찰가 비교는 입찰결과 자료가 현재 조회되지 않아 다음에 붙입니다.</p>';
   }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
 }
+function median(a){a=a.filter(function(x){return x>0;}).sort(function(x,y){return x-y;});if(!a.length)return 0;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
+function bdAwards(){
+  var box=$('#bd-near'),b=BQ(),k=BD.kind(b.kind),cl=KCLS[b.kind]||[];if(!box)return;
+  var kw=cl[2]?'':bidName().replace(/\s*(용역|공사|계약|선정)\s*/g,' ').trim().split(/\s+/)[0]||'';
+  var unit=b.kind==='elev'?'elev':'hh';
+  box.innerHTML='<p class="muted">같은 업종의 낙찰·계약 사례를 찾는 중입니다 (10~20초)…</p>';
+  fetch(kapiBase()+'/api/awards?'+(cl[1]?'c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+'&unit='+unit).then(function(r){return r.json();}).then(function(j){
+    if(!j.ok)throw new Error(j.error||'없음');
+    var L=j.list.filter(function(x){return !/테스트|test/i.test(x.t);});
+    if(!L.length){box.innerHTML='<p class="note">같은 업종 사례를 찾지 못했습니다. (최근 공고 단지 '+j.searched+'곳의 지난 낙찰 결과, 최근 90일 수의계약 공지를 찾아봤습니다)</p>';return;}
+    var svc=k.g==='용역'||k.g==='관리업자';
+    L.forEach(function(x){var ok=/^\d{4}-\d{2}-\d{2}$/.test(x.s)&&/^\d{4}-\d{2}-\d{2}$/.test(x.e);var mo=ok?Math.max(1,Math.round((BD.diff(x.s,x.e)+1)/30.44)):0;x.mo=mo;x.mon=svc&&mo>=2?x.amt/mo:0;var u=unit==='elev'?x.ev:x.hh;x.u=u;x.per=x.mon&&u?x.mon/u:0;});
+    var mMon=median(L.map(function(x){return x.mon;})),mPer=median(L.map(function(x){return x.per;}));
+    var uName=unit==='elev'?'승강기 1대':'1세대';
+    var ourMon=b.amtMode==='month'?num(b.amt):(num(b.months)?num(b.amt)/num(b.months):0),ourU=unit==='elev'?num(b.cx&&b.cx.ev):num(state.complex.units),ourPer=ourMon&&ourU?ourMon/ourU:0;
+    var cmp=ourPer&&mPer?Math.round((ourPer/mPer-1)*100):null;
+    var won=function(v){return Math.round(v).toLocaleString('ko-KR')+'원';};
+    var nA=L.filter(function(x){return x.src==='낙찰';}).length,nC=L.length-nA;
+    box.innerHTML='<div class="note" style="margin:0"><b>같은 업종 계약금액 사례 '+L.length+'건</b> (경쟁입찰 낙찰 '+nA+' · 수의계약 '+nC+')<br>'+
+      (svc?(mMon?'월 환산 중간값 '+won(mMon):'')+(mPer?' · <b>'+uName+'당 월 '+won(mPer)+'</b>':''):'금액 중간값 '+won(median(L.map(function(x){return x.amt;}))))+
+      (svc&&ourPer?'<br>우리 예정 금액: '+uName+'당 월 '+won(ourPer)+(cmp!==null?' → 중간값보다 <b>'+(cmp>=0?cmp+'% 높음':(-cmp)+'% 낮음')+'</b>':''):(svc&&mPer?'<br><span class="muted">예정 금액과 '+(unit==='elev'?'④의 승강기 대수':'홈의 세대수')+'를 넣으면 비교합니다.</span>':''))+'</div>'+
+      '<div style="overflow-x:auto;margin-top:.4rem"><table class="kt nw"><thead><tr><th>구분</th><th>단지</th><th>계약명</th><th>금액</th><th>기간</th><th>'+(unit==='elev'?'대수':'세대')+'</th>'+(svc?'<th>'+uName+'당 월</th>':'')+'</tr></thead><tbody>'+
+      L.sort(function(a,z){return z.per-a.per||z.amt-a.amt;}).map(function(x){return '<tr><td><span class="tag '+(x.src==='낙찰'?'on':'link')+'">'+esc(x.src)+'</span></td><td>'+esc(x.apt)+'<br><small class="muted">'+esc(String(x.reg||'').slice(0,10))+'</small></td><td>'+esc(cut(x.t,22))+(x.suc?'<br><small class="muted">'+esc(SUCW[x.suc]||'')+'</small>':'')+'</td><td style="text-align:right">'+x.amt.toLocaleString('ko-KR')+'</td><td>'+(x.mo?x.mo+'개월':'')+'</td><td>'+(x.u||'')+'</td>'+(svc?'<td style="text-align:right">'+(x.per?won(x.per):'')+'</td>':'')+'</tr>';}).join('')+'</tbody></table></div>'+
+      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료: 최근 같은 업종 공고를 낸 단지들의 지난 낙찰 결과(최근 3년)와 최근 90일 수의계약 공지. 용역 금액은 계약기간 전체 금액으로 보고 개월 수로 나눴습니다(지침 제28조제2항). 단지에 따라 월 금액으로 등록한 경우가 있어 지나치게 낮은 값은 빼고 보세요. 유지관리 방식(POG/FM)·인원·근무형태 차이도 감안하세요.</p>';
+  }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
+}
 function bdAct(act,a){
   var b=BQ(),re=function(){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);};
   if(act==='bddocx'){var J=bidJ(),S=BD.schedule(b,J),d=bidDoc(a.dataset.kind,J,S);makeDocx(d.blocks,d.opt).then(function(blob){return saveFile(d.name+'_'+bidName()+'_'+state.complex.name+'.docx',blob);}).catch(function(){toast('문서를 만들지 못했습니다.');});return true;}
@@ -2860,6 +2886,7 @@ function bdAct(act,a){
     if(x[4]&&!b.start){b.start=BD.add(x[4],1);if(x[3]){var len=BD.diff(x[3],x[4]);if(len>0)b.end=BD.add(b.start,len);}}
     b.special=b.special||'';saveNow();re();toast('지난 계약('+x[1]+') 금액·기간을 참고로 넣었습니다. 금액이 월 기준인지 확인하세요.');return true;}
   if(act==='bdnear'){bdNear();return true;}
+  if(act==='bdaward'){bdAwards();return true;}
   if(act==='bdkcopy'){var J2=bidJ(),S2=BD.schedule(b,J2);copyText(bidKaptRows(J2,S2).map(function(r){return r[0]+': '+r[1];}).join('\n'));return true;}
   if(act==='bdscadd'){b.cos.push({name:'',price:'',s:{}});saveNow();refreshBid(true);return true;}
   if(act==='bdscdel'){b.cos.splice(+a.dataset.i,1);saveNow();refreshBid(true);return true;}
