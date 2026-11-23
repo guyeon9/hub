@@ -881,7 +881,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8.3';
+var APP_VER='1.8.4';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2345,29 +2345,34 @@ function addLines(cur,add){var have=lines(cur);add.forEach(function(x){if(have.i
 function refPick(body){
   var out=[],seen={};
   var push=function(s){
-    s=s.replace(/^\s*([가-하]|\d{1,2}|[①-⑳]|[-·•※▶○◦*])\s*[\.\)]?\s*/,'').replace(/\s+/g,' ').trim();
+    s=s.replace(/^\s*([가-하]|\d{1,2}|[①-⑳㉠-㉭]|[-·•※▶○◦*])\s*[\.\)]?\s*/,'').replace(/\s+/g,' ').trim();
     var m=s.match(/([가-힣·]+업)\s*(등록증|허가증|신고증|신고필증|면허증)/);
-    if(m)s=m[1]+' '+({'등록증':'등록','허가증':'허가','면허증':'면허'}[m[2]]||'신고')+' 업체';
+    var lic='';
+    if(m){lic=m[1].replace(/\s/g,'');s=m[1]+' '+({'등록증':'등록','허가증':'허가','면허증':'면허'}[m[2]]||'신고')+' 업체';}
     else if(/(사본|증명서|\d\s*부\b|제출)/.test(s)&&!/(자본금|실적)/.test(s))return;
-    if(s.length<6||s.length>170||/제\s*(26|18)\s*조|참가자격의\s*제한|공고문\s*참조|첨부/.test(s))return;
+    if(s.length<6||s.length>220||/제\s*(26|18)\s*조|참가자격의\s*제한|공고문\s*참조|첨부/.test(s))return;
     var key=s.replace(/\s/g,'');if(seen[key])return;seen[key]=1;
     var t=/(산출|노무비|최저임금|일반관리비|이윤|단가|퇴직|4대\s*보험|사회보험)/.test(s)?'calc':/(자본금|실적|세대\s*이상|단지\s*이상|기술\s*인력|보유)/.test(s)?'lim':'qual';
-    out.push({t:t,s:s});
+    out.push({t:t,s:s,lic:lic});
   };
-  var inQ=false;
+  var inQ=false,raw=[],flush=function(){raw.forEach(push);raw=[];};
+  var mark=/^([가-하]\s*[\.\)]|\(?\d{1,2}\s*\)|[①-⑳㉠-㉭]|[-·•※▶○◦*])/;
   String(body||'').replace(/\r/g,'').split('\n').forEach(function(s){
     s=s.replace(/\t/g,' ').replace(/\s+/g,' ').trim();if(!s)return;
     if(/^\d{1,2}\s*\.(?!\d)/.test(s)){
+      flush();
       inQ=/(참가|입찰)\s*자격|자격\s*요건|산출\s*기준/.test(s);
       var rest=s.replace(/^\d{1,2}\s*\.\s*[^:：]*[:：]\s*/,'');
-      if(inQ&&rest!==s)push(rest);
+      if(inQ&&rest!==s)raw.push(rest);
       return;
     }
-    if(inQ)push(s);
-    else if(/(자본금\s*[\d.]+\s*억|최저임금|일반관리비|이윤|노무비)/.test(s))push(s);
-    else{var m=s.match(/([가-힣·]+업)\s*(등록증|허가증|신고증|신고필증|면허증)/);if(m)push(s);}
+    if(inQ){if(mark.test(s)||!raw.length)raw.push(s);else raw[raw.length-1]+=' '+s;return;}
+    if(/(자본금\s*[\d.]+\s*억|최저임금|일반관리비|이윤|노무비)/.test(s))push(s);
+    else if(/([가-힣·]+업)\s*(등록증|허가증|신고증|신고필증|면허증)/.test(s))push(s);
   });
-  return out;
+  flush();
+  /* 제출서류의 '○○업 등록증'에서 만든 줄은, 참가자격에 같은 업종이 이미 있으면 뺀다 */
+  return out.filter(function(o){return !o.lic||!out.some(function(z){return z!==o&&!z.lic&&z.s.replace(/\s/g,'').indexOf(o.lic)>=0;});});
 }
 var bdRefList=null;
 function bdRef(){
