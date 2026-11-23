@@ -881,7 +881,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8.2';
+var APP_VER='1.8.3';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2314,6 +2314,97 @@ function CHK(label,bind,on,o){o=o||{};return '<label class="row" style="gap:.4re
 var KCLS={mgr:['01','01',''],defect:['02','02',''],ltm:['02','02',''],repair:['02','02',''],elec:['02','03','08'],guard:['02','03','04'],clean:['02','03','05'],disinf:['02','03','13'],elev:['02','03','06'],homenet:['02','03',''],septic:['02','03','09'],tank:['02','03','10'],diag:['02','03','11'],facil:['02','03','12'],etc:['02','03','12'],buy:['02','04',''],sell:['02','05','15'],income:['02','05','15'],ins:['02','05','16']};
 var SUCW={'01':'최저(고)낙찰','02':'적격심사','03':'최저낙찰','04':'최고낙찰','05':'적격심사(최저)','06':'적격심사(최고)'},CKIND={'01':'일반경쟁','02':'제한경쟁','03':'지명경쟁'};
 function isResident(k){return k.id==='guard'||k.id==='clean';}
+/* ⑥ 업종별 참가자격·산출기준 예시 (법제처 조문 확인: 승강기법 제39조, 하수도법 제45조, 감염병예방법 제52조 — 2026.11.) */
+var GONG_Q=['「건설산업기본법」 제9조에 따라 해당 공사업(예: 도장·습식·방수·석공사업)을 등록한 업체','(전기공사가 포함된 경우) 「전기공사업법」에 따라 전기공사업을 등록한 업체','(소방공사가 포함된 경우) 「소방시설공사업법」에 따라 소방시설업을 등록한 업체'];
+var GONG_C=['공사비는 설계도서 및 물량내역서에 따라 산출하고, 입찰 시 산출내역서를 제출함','물량내역서의 공종·규격·수량은 임의로 바꿀 수 없음','산업안전보건관리비 등 법정 경비는 관계 법령에 따른 요율 이상 계상함','금액은 부가가치세를 제외하여 적음'];
+var RES_C=['노무비(기본급)는 2027년 최저임금(시급 10,700원) 이상으로 산출함','4대 보험료(국민연금·건강보험·장기요양·고용·산재)는 법정 요율로 산출함','퇴직급여충당금·연차수당은 「근로기준법」 및 「근로자퇴직급여 보장법」에 따라 계상함','일반관리비는 노무비의 ○% 이내, 이윤은 노무비와 일반관리비 합계의 ○% 이내로 함','피복비·교육훈련비·복리후생비 등 경비는 산출내역서에 항목별로 구분해 적음'];
+var QEX={
+  mgr:{q:['「공동주택관리법」 제52조에 따라 주택관리업 등록을 한 업체'],c:['위탁관리수수료는 월 정액(부가가치세 별도)으로 적음 (또는 ㎡당 단가 × 관리면적)','관리비로 지급하는 인건비 등은 입찰가격에 넣지 않음']},
+  defect:{q:GONG_Q,c:GONG_C},ltm:{q:GONG_Q,c:GONG_C},repair:{q:GONG_Q,c:GONG_C},
+  elec:{q:['「전기안전관리법」에 따라 전기안전관리 대행사업자로 등록한 업체'],c:['월 대행 수수료(부가가치세 별도)로 산출함','점검 횟수·방법은 「전기안전관리법」 관련 기준 이상으로 함']},
+  guard:{q:['「경비업법」 제4조에 따라 시설경비업 허가를 받은 법인'],c:RES_C.concat(['근무형태·휴게시간은 공고된 내용(⑤ 인원·근무형태 표)에 따라 산출함'])},
+  clean:{q:['「공중위생관리법」 제3조에 따라 건물위생관리업 신고를 한 업체'],c:RES_C.concat(['청소 소모품·장비 비용의 부담 주체를 산출내역서에 적음 (예: 소모품은 용역업체 부담)'])},
+  disinf:{q:['「감염병의 예방 및 관리에 관한 법률」 제52조에 따라 소독업 신고를 한 업체'],c:['회당 소독 단가 × 연간 횟수로 산출함 (횟수는 법정 기준 이상, 예: 하절기 월 1회·동절기 분기 1회)','소독 범위(세대·공용부·지하주차장 등)와 약제 종류를 산출내역서에 적음']},
+  elev:{q:['「승강기 안전관리법」 제39조에 따라 승강기 유지관리업 등록을 한 업체'],c:['승강기 1대당 월 유지관리비 × 대수 = 월 용역금액(부가가치세 별도)으로 산출함','유지관리 방식: 단순유지관리(POG) / 종합유지관리(FM) 중 공고한 방식으로 산출함','자체점검은 월 1회 이상(「승강기 안전관리법」 제31조) 기준으로 함','업체가 부담하는 소모품·부품 교체 범위를 산출내역서에 적음']},
+  homenet:{q:['해당 홈네트워크 설비의 유지관리가 가능한 업체 (사업 내용에 정보통신공사가 포함되면 「정보통신공사업법」 제14조에 따른 정보통신공사업 등록 업체)'],c:['월 유지관리비(부가가치세 별도)로 산출함','점검 대상(월패드·로비폰·서버 등)과 부품 교체 범위를 산출내역서에 적음']},
+  septic:{q:['「하수도법」 제45조에 따라 분뇨수집·운반업 허가를 받은 업체'],c:['㎥당 단가 × 처리량(정화조 용량)으로 산출함','내부청소는 법정 횟수(연 1회) 이상으로 함']},
+  tank:{q:['「수도법」에 따라 저수조청소업 신고를 한 업체'],c:['회당 청소 단가 × 연 2회(반기 1회 이상)로 산출함','수질검사 포함 여부와 비용을 산출내역서에 적음']},
+  diag:{q:['「시설물의 안전 및 유지관리에 관한 특별법」에 따라 등록한 안전진단전문기관'],c:['엔지니어링사업 대가 기준 등을 참고해 과업별로 산출함','과업 범위(정밀점검·정밀안전진단 등)와 보고서 부수를 산출내역서에 적음']},
+  facil:{q:['위탁 운영하는 시설에 필요한 신고·등록을 갖춘 업체 (예: 「체육시설의 설치·이용에 관한 법률」에 따른 체육시설업 신고)'],c:['위탁 수수료는 월 정액 또는 수입의 ○%로 적음']},
+  etc:{q:['사업 내용에 필요한 면허·등록·신고를 갖춘 업체'],c:['월 용역금액(부가가치세 별도) 또는 총액으로 적음']},
+  buy:{q:['해당 물품을 공급할 수 있는 사업자 (사업자등록증 업태·종목 확인)'],c:['물품 사양서의 규격·수량 기준으로 단가 × 수량을 적음 (운반·설치비 포함 여부 명시)']},
+  sell:{q:['재활용품 수집·판매업을 하는 사업자 (사업자등록증 업태·종목 확인)'],c:['매각 단가(원/kg 또는 월 정액)를 적고, 계량은 관리주체 입회 아래 함']},
+  income:{q:['광고 대행업을 하는 사업자 (사업자등록증 업태·종목 확인)'],c:['월 광고(게재)료를 적음']},
+  ins:{q:['「보험업법」에 따라 허가를 받은 보험회사'],c:['보험료(연납/월납)와 보장 내용을 함께 적음']}
+};
+/* 인근 낙찰가 비교에서 제목으로 거를 낱말 (같은 분류코드에 다른 일이 섞여 있음: 2026.11. 확인) */
+var AFILT={elev:{inc:'유지|보수',ex:'안전점검|정밀|공사|교체|설치|리모델링|부품'},guard:{ex:'CCTV|씨씨티비|공사|설치|교체|보험'},clean:{ex:'정화조|고압|세정|저수조|물탱크|배관|덕트|외벽|유리|방역|소독|준공'},disinf:{ex:'청소|공사'},septic:{ex:'공사|설치'},tank:{ex:'공사|교체|설치'},elec:{ex:'공사|교체|설치|정밀'},homenet:{ex:'공사|교체|설치'}};
+function qex(kind){return QEX[kind]||QEX.etc;}
+function addLines(cur,add){var have=lines(cur);add.forEach(function(x){if(have.indexOf(x)<0)have.push(x);});return have.join('\n');}
+/* 공고 본문에서 참가자격·제한요건·산출기준 줄 골라내기 */
+function refPick(body){
+  var out=[],seen={};
+  var push=function(s){
+    s=s.replace(/^\s*([가-하]|\d{1,2}|[①-⑳]|[-·•※▶○◦*])\s*[\.\)]?\s*/,'').replace(/\s+/g,' ').trim();
+    var m=s.match(/([가-힣·]+업)\s*(등록증|허가증|신고증|신고필증|면허증)/);
+    if(m)s=m[1]+' '+({'등록증':'등록','허가증':'허가','면허증':'면허'}[m[2]]||'신고')+' 업체';
+    else if(/(사본|증명서|\d\s*부\b|제출)/.test(s)&&!/(자본금|실적)/.test(s))return;
+    if(s.length<6||s.length>170||/제\s*(26|18)\s*조|참가자격의\s*제한|공고문\s*참조|첨부/.test(s))return;
+    var key=s.replace(/\s/g,'');if(seen[key])return;seen[key]=1;
+    var t=/(산출|노무비|최저임금|일반관리비|이윤|단가|퇴직|4대\s*보험|사회보험)/.test(s)?'calc':/(자본금|실적|세대\s*이상|단지\s*이상|기술\s*인력|보유)/.test(s)?'lim':'qual';
+    out.push({t:t,s:s});
+  };
+  var inQ=false;
+  String(body||'').replace(/\r/g,'').split('\n').forEach(function(s){
+    s=s.replace(/\t/g,' ').replace(/\s+/g,' ').trim();if(!s)return;
+    if(/^\d{1,2}\s*\.(?!\d)/.test(s)){
+      inQ=/(참가|입찰)\s*자격|자격\s*요건|산출\s*기준/.test(s);
+      var rest=s.replace(/^\d{1,2}\s*\.\s*[^:：]*[:：]\s*/,'');
+      if(inQ&&rest!==s)push(rest);
+      return;
+    }
+    if(inQ)push(s);
+    else if(/(자본금\s*[\d.]+\s*억|최저임금|일반관리비|이윤|노무비)/.test(s))push(s);
+    else{var m=s.match(/([가-힣·]+업)\s*(등록증|허가증|신고증|신고필증|면허증)/);if(m)push(s);}
+  });
+  return out;
+}
+var bdRefList=null;
+function bdRef(){
+  var box=$('#bd-ref'),b=BQ(),cl=KCLS[b.kind]||[];if(!box)return;
+  var ed=new Date(),st=new Date(ed.getTime()-45*86400000),f=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  box.innerHTML='<p class="muted">최근 45일 전국 같은 업종 입찰공고 본문을 읽는 중…</p>';
+  fetch(kapiBase()+'/api/bids?start='+f(st)+'&end='+f(ed)+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')).then(function(r){return r.json();}).then(function(j){
+    if(!j.ok)throw new Error(j.error||'없음');
+    var fl=AFILT[b.kind],exw=fl&&fl.ex?fl.ex.split('|'):[];
+    var L=j.list.filter(function(x){return !/테스트|test/i.test(x.t)&&!exw.some(function(w){return String(x.t).indexOf(w)>=0;});});
+    var withP=[],noBody=[];
+    L.forEach(function(x){var p=refPick(x.body);if(p.length)withP.push({x:x,p:p});else noBody.push(x);});
+    bdRefList=withP;paintRef(L.length,noBody);
+  }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
+}
+function paintRef(n,noBody){
+  var box=$('#bd-ref');if(!box||!bdRefList)return;
+  var lab={qual:'참가자격',lim:'제한요건',calc:'산출기준'};
+  var fileA=function(x){return x.file?' <a href="http://www.k-apt.go.kr/bid/bidFileDownload.do?file_type=bid&file_num='+encodeURIComponent(x.file)+'" target="_blank" rel="noopener">공고문</a>':'';};
+  var cnt={qual:0,lim:0,calc:0};bdRefList.forEach(function(r){r.p.forEach(function(y){cnt[y.t]++;});});
+  if(!bdRefList.length){box.innerHTML='<p class="note">최근 45일 같은 업종 공고 '+n+'건 모두 본문이 짧아 문구를 뽑지 못했습니다. 첨부 공고문을 직접 열어 보세요.</p>'+(noBody.length?'<p style="font-size:.85rem">'+noBody.slice(0,6).map(function(x){return esc(x.apt)+fileA(x);}).join(' · ')+'</p>':'');return;}
+  box.innerHTML='<div class="note" style="margin:0"><b>다른 단지 공고 '+bdRefList.length+'건에서 뽑은 문구</b> (최근 45일 같은 업종 '+n+'건 중 본문에 적힌 것) · 참가자격 '+cnt.qual+' · 제한요건 '+cnt.lim+' · 산출기준 '+cnt.calc+'<br><span class="muted">"넣기"를 누르면 해당 칸 끝에 붙습니다. 우리 단지에 맞는지 꼭 고쳐 쓰세요. 과도한 제한은 안 됩니다(지침 별표 1).</span></div>'+
+    bdRefList.slice(0,10).map(function(r,i){return '<div style="border-top:1px solid var(--line,#ddd);padding:.5rem 0;font-size:.86rem"><b>'+esc(r.x.apt)+'</b> <small class="muted">'+esc(String(r.x.reg||'').slice(0,10))+' · '+esc(cut(r.x.t,30))+'</small>'+fileA(r.x)+
+      '<ul style="margin:.3rem 0 0;padding-left:1.1rem">'+r.p.slice(0,8).map(function(y,k){return '<li style="margin:.15rem 0"><span class="tag">'+lab[y.t]+'</span> '+esc(y.s)+' <button type="button" class="btn ghost sm" data-act="bdrefuse" data-i="'+i+'" data-k="'+k+'">넣기</button></li>';}).join('')+'</ul></div>';}).join('')+
+    (noBody.length?'<p class="muted" style="font-size:.8rem;margin:.4rem 0 0">본문 없이 첨부 공고문에만 적은 공고 '+noBody.length+'건: '+noBody.slice(0,6).map(function(x){return esc(x.apt)+fileA(x);}).join(' · ')+'</p>':'');
+}
+function bdExAct(act,a){
+  var b=BQ(),re=function(){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);};
+  if(act==='bdqex'){b.qual=addLines(b.qual,qex(b.kind).q);saveNow();re();toast('업종 예시를 넣었습니다. 우리 사업에 맞게 고치세요.');return true;}
+  if(act==='bdcex'){var c=qex(b.kind).c;b.calc=addLines(b.calc,c);saveNow();re();toast('산출 기준 예시를 넣었습니다. ○ 표시를 채우세요.');return true;}
+  if(act==='bdref'){bdRef();return true;}
+  if(act==='bdrefuse'){var r=bdRefList&&bdRefList[+a.dataset.i],y=r&&r.p[+a.dataset.k];if(!y)return true;
+    var fld=y.t==='calc'?'calc':y.t==='lim'?'limitTxt':'qual';b[fld]=addLines(b[fld],[y.s]);saveNow();
+    var keep=$('#bd-ref').innerHTML;re();var bx=$('#bd-ref');if(bx){bx.innerHTML=keep;}
+    toast((fld==='limitTxt'?'제한 요건':fld==='calc'?'입찰가격 산출 기준':'추가 참가자격')+'에 넣었습니다.'+(fld==='limitTxt'&&b.type!=='제한경쟁'?' 입찰 종류가 제한경쟁일 때만 공고에 들어갑니다.':''));return true;}
+  return false;
+}
 var OUTLINE={
   elev:'용역명: 승강기 유지관리 (유지관리 방식: 단순유지관리(POG) / 종합유지관리(FM) 중 선택)\n대상: 승강기 ○대 (제조사 ○○, 승객용 ○인승, 정격속도 ○m/s)\n점검: 「승강기 안전관리법」에 따른 월 1회 이상 자체점검, 정기검사 대응, 고장 시 출동\n부품: 소모성·긴급성 부품 교체 범위 (POG는 별도 정산)\n하자담보기간: (설치 하자기간이 남아 있으면 적기)',
   guard:'용역명: 경비용역 (시설경비)\n업무범위: 「경비업법」에 따른 시설경비업무와 공동주택관리법 제65조의2에 따라 허용되는 업무 (청소 보조, 분리배출 정리, 주차관리, 택배 보관 등)\n근무형태·인원: 아래 인원표 (입찰자가 임의로 바꿀 수 없음)\n경비초소: ○개소',
@@ -2383,11 +2474,13 @@ function renderBid(v){
     (isResident(k)?'<p style="margin:.9rem 0 .3rem;font-weight:600;font-size:.92rem">인원·근무형태 표</p><div id="bd-staff"></div><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="bdsadd">직책 추가</button></div>':'')+
   '</section>'+
   '<section class="card"><h2>⑥ 참가자격·가격 기준</h2><div class="grid2">'+
-    F('추가 참가자격 (면허·등록)',BP('qual'),b.qual,{area:1,rows:2,wide:1,ph:'예: 「승강기 안전관리법」 제39조에 따른 유지관리업 등록 업체',hint:'지침 제26조 제한사유는 자동으로 들어갑니다. 여기에는 사업종류별 면허·등록만 적으세요.'})+
-    F('입찰가격 산출 기준',BP('calc'),b.calc,{area:1,rows:3,wide:1,ph:isResident(k)?'예: 노무비는 2027년 최저임금(시급 10,700원) 이상\n일반관리비·이윤은 각 노무비의 ○% 이내':'예: 물량내역서에 따라 산출',hint:'공고에 명시하지 않은 기준으로는 무효 처리할 수 없습니다(별표 3 제7호).'+(isResident(k)?' ⑨ 산출내역서 계산기로 예정 금액을 먼저 잡아 보세요.':'')})+
+    F('추가 참가자격 (면허·등록)',BP('qual'),b.qual,{area:1,rows:2,wide:1,ph:'예: '+qex(b.kind).q[0],hint:'지침 '+(k.g==='관리업자'?'제18조':'제26조')+' 제한사유는 자동으로 들어갑니다. 여기에는 사업종류별 면허·등록만 적으세요. 자본금·실적 제한은 ② 제한 요건 칸에 적습니다.'})+
+    '<div class="row" style="grid-column:1/-1;margin:-.2rem 0 .2rem"><button type="button" class="btn ghost sm" data-act="bdqex">'+esc(k.t.replace(/\s*\(.*\)$/,''))+' 참가자격 예시 넣기</button></div>'+
+    F('입찰가격 산출 기준',BP('calc'),b.calc,{area:1,rows:3,wide:1,ph:'예: '+qex(b.kind).c.slice(0,2).join('\n'),hint:'공고에 명시하지 않은 기준으로는 무효 처리할 수 없습니다(별표 3 제7호).'+(isResident(k)?' ⑨ 산출내역서 계산기로 예정 금액을 먼저 잡아 보세요.':'')})+
+    '<div class="row" style="grid-column:1/-1;margin:-.2rem 0 .2rem"><button type="button" class="btn ghost sm" data-act="bdcex">산출 기준 예시 넣기</button></div>'+
     F('입찰가격 상한 (선택)',BP('cap'),b.cap,{ph:'예: 60,000,000'})+SEL('상한 근거',BP('capBasis'),b.capBasis,[['','—'],['3개소 이상 견적서','3개소 이상 견적서'],['지방자치단체 자문검토결과','지방자치단체 자문검토결과'],['관계전문가 확인','건축사·기술사 등 관계전문가 확인'],['공동주택관리 지원기구 자문','공동주택관리 지원기구 자문']])+
     (k.g==='공사'?F('하자보수보증금 예치율 (선택)',BP('defectRate'),b.defectRate,{ph:'예: 3',hint:'비우면 국가계약법 시행령 제62조 준용. 입대의 의결로 2~10% 가능(지침 제32조).'}):'')+
-  '</div></section>'+
+  '</div><div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-act="bdref">다른 단지 공고 문구 보기 (K-apt)</button></div><div id="bd-ref" style="margin-top:.5rem"></div></section>'+
   '<section class="card"><h2>⑦ 현장설명·계약·보증금</h2><div class="grid2">'+
     (b.site?CHK('현장설명회 참가 의무 (불참 시 입찰 무효)',BP('siteMust'),b.siteMust,{wide:1})+CHK('대리 참석은 재직증명서·명함으로 확인',BP('proxy'),b.proxy,{wide:1}):'')+
     CHK('사업설명회(PT) 개최',BP('pt.on'),b.pt.on,{wide:1})+
@@ -2837,7 +2930,7 @@ function bdNear(){
     box.innerHTML='<div class="note" style="margin:0"><b>최근 45일 전국 같은 업종 공고 '+n+'건</b><br>경쟁 종류: '+cnt('kind',CKIND)+'<br>낙찰 방법: '+cnt('suc',SUCW)+'<br>현장설명회 '+Math.round(site*100/n)+'% · 긴급 '+em+'건 · 재공고 '+re+'건'+(caps.length?'<br>공고 본문에 적힌 자본금 제한: '+esc(caps.slice(0,8).join(', ')):'')+'</div>'+
       '<div style="overflow-x:auto;margin-top:.4rem"><table class="kt"><thead><tr><th>공고일</th><th>단지 · 공고명</th><th>방법</th><th></th></tr></thead><tbody>'+L.slice(0,12).map(function(x){
         return '<tr><td style="white-space:nowrap">'+esc(String(x.reg).slice(5))+'</td><td>'+esc(x.apt)+'<br><small>'+esc(x.t)+'</small></td><td><small>'+esc(CKIND[x.kind]||'')+'<br>'+esc(SUCW[x.suc]||'')+'</small></td><td>'+(x.file?'<a href="http://www.k-apt.go.kr/bid/bidFileDownload.do?file_type=bid&file_num='+encodeURIComponent(x.file)+'" target="_blank" rel="noopener">공고문</a>':'')+'</td></tr>';}).join('')+'</tbody></table></div>'+
-      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료(국토교통부 공동주택 입찰공고 정보). 낙찰가 비교는 입찰결과 자료가 현재 조회되지 않아 다음에 붙입니다.</p>';
+      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료(국토교통부 공동주택 입찰공고 정보). 금액 비교는 "같은 업종 낙찰가 보기"를 누르세요.</p>';
   }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
 }
 function median(a){a=a.filter(function(x){return x>0;}).sort(function(x,y){return x-y;});if(!a.length)return 0;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
@@ -2847,8 +2940,9 @@ function bdAwards(){
   var unit=b.kind==='elev'?'elev':'hh';
   var code=kcode();if(!/^A\d{8}$/.test(code)){box.innerHTML='<p class="note">홈의 "K-apt에서 가져오기"에 우리 단지코드를 먼저 넣으세요. 같은 시·군·구 단지를 찾는 데 씁니다.</p>';return;}
   box.innerHTML='<p class="muted">같은 시·군·구 단지들의 같은 업종 계약·낙찰 금액을 찾는 중입니다 (10~20초)…</p>';
-  fetch(kapiBase()+'/api/awards?code='+code+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+'&unit='+unit).then(function(r){return r.json();}).then(function(j){
+  fetch(kapiBase()+'/api/awards?code='+code+(cl[1]?'&c2='+cl[1]:'')+(cl[2]?'&c3='+cl[2]:'')+(kw?'&kw='+encodeURIComponent(kw):'')+(AFILT[b.kind]&&AFILT[b.kind].inc?'&inc='+encodeURIComponent(AFILT[b.kind].inc):'')+(AFILT[b.kind]&&AFILT[b.kind].ex?'&ex='+encodeURIComponent(AFILT[b.kind].ex):'')+'&unit='+unit).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'없음');
+    if(!j.area||/^\d+$/.test(j.area))j.area='같은 시·군·구';
     var L=j.list.filter(function(x){return !/테스트|test/i.test(x.t);});
     if(!L.length){box.innerHTML='<p class="note">'+esc(j.area||'')+' 단지 '+j.searched+'곳(전체 '+j.inArea+'곳 중 같은 동 우선)의 최근 4년 계약·낙찰에서 같은 업종 사례를 찾지 못했습니다.</p>';return;}
     var svc=k.g==='용역'||k.g==='관리업자';
@@ -2864,10 +2958,11 @@ function bdAwards(){
       (svc&&ourPer?'<br>우리 예정 금액: '+uName+'당 월 '+won(ourPer)+(cmp!==null?' → 중간값보다 <b>'+(cmp>=0?cmp+'% 높음':(-cmp)+'% 낮음')+'</b>':''):(svc&&mPer?'<br><span class="muted">예정 금액과 '+(unit==='elev'?'④의 승강기 대수':'홈의 세대수')+'를 넣으면 비교합니다.</span>':''))+'</div>'+
       '<div style="overflow-x:auto;margin-top:.4rem"><table class="kt nw"><thead><tr><th>구분</th><th>단지</th><th>계약명</th><th>금액</th><th>기간</th><th>'+(unit==='elev'?'대수':'세대')+'</th>'+(svc?'<th>'+uName+'당 월</th>':'')+'</tr></thead><tbody>'+
       L.sort(function(a,z){return z.per-a.per||z.amt-a.amt;}).map(function(x){return '<tr><td><span class="tag '+(x.src==='낙찰'?'on':'link')+'">'+esc(x.src)+'</span></td><td>'+esc(x.apt)+'<br><small class="muted">'+esc(x.dong||'')+' · '+esc(String(x.reg||'').slice(0,10))+'</small></td><td>'+esc(cut(x.t,22))+(x.suc?'<br><small class="muted">'+esc(SUCW[x.suc]||'')+'</small>':'')+'</td><td style="text-align:right">'+x.amt.toLocaleString('ko-KR')+'</td><td>'+(x.mo?x.mo+'개월':'')+'</td><td>'+(x.u||'')+'</td>'+(svc?'<td style="text-align:right">'+(x.per?won(x.per):'')+'</td>':'')+'</tr>';}).join('')+'</tbody></table></div>'+
-      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료: 같은 시·군·구 단지(같은 동 먼저, 최대 14곳)의 최근 4년 수의계약 공지와 입찰결과 중 같은 업종 가장 최근 1건씩. 용역 금액은 계약기간 전체 금액으로 보고 개월 수로 나눴습니다(지침 제28조제2항). 단지에 따라 월 금액으로 등록한 경우가 있어 지나치게 낮은 값은 빼고 보세요. 유지관리 방식(POG/FM)·인원·근무형태 차이도 감안하세요.</p>';
+      '<p class="muted" style="font-size:.8rem;margin:.3rem 0 0">K-apt 공개자료: 같은 시·군·구 단지(같은 동 먼저, 최대 13곳)의 최근 4년 수의계약 공지와 입찰결과 중 같은 업종 가장 최근 1건씩. 용역 금액은 계약기간 전체 금액으로 보고 개월 수로 나눴습니다(지침 제28조제2항). 단지에 따라 월 금액으로 등록한 경우가 있어 지나치게 낮은 값은 빼고 보세요. 유지관리 방식(POG/FM)·인원·근무형태 차이도 감안하세요.</p>';
   }).catch(function(e){box.innerHTML='<p class="note">'+(/not found|404/.test(String(e))?'통로 서버를 새 코드로 바꿔야 합니다(kapt-hub 최신본).':/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+esc(e.message))+'</p>';});
 }
 function bdAct(act,a){
+  if(bdExAct(act,a))return true;
   var b=BQ(),re=function(){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);};
   if(act==='bddocx'){var J=bidJ(),S=BD.schedule(b,J),d=bidDoc(a.dataset.kind,J,S);makeDocx(d.blocks,d.opt).then(function(blob){return saveFile(d.name+'_'+bidName()+'_'+state.complex.name+'.docx',blob);}).catch(function(){toast('문서를 만들지 못했습니다.');});return true;}
   if(act==='bdnew'){var nb=bidDefault();nb.place=b.place;nb.tel=b.tel;nb.addr=b.addr;nb.dongs=b.dongs;nb.cx=JSON.parse(JSON.stringify(b.cx));nb.acct=b.acct;nb.bizno=b.bizno;nb.agent=b.agent;nb.eval=evalDefault(nb.kind);state.bids.push(nb);state.bidCur=state.bids.length-1;saveNow();re();toast('새 건을 만들었습니다. 단지 현황은 이어서 씁니다.');return true;}
@@ -2904,7 +2999,6 @@ function bdAct(act,a){
   }
   return false;
 }
-
 /* ═════════ 동대표·선관위 선거 ═════════
    근거: 공동주택관리법 제14조·제15조·제16조·제19조, 같은 법 시행령 제11조·제12조·제13조·제15조·제16조·제21조 (2026. 7. 1. 시행)
    날짜 간격은 관리규약마다 다르므로 ③에서 고칠 수 있게 함 */
