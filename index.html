@@ -86,6 +86,10 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .btn.danger{border-color:var(--seal);color:var(--seal);background:transparent}
 .row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .muted{color:var(--muted);font-size:.82rem}
+.rk-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:.5rem}
+.rk-stat{border:1px solid var(--line);border-radius:.6rem;padding:.55rem .7rem;display:flex;flex-direction:column;gap:.05rem;background:var(--surface)}
+.rk-stat b{font-size:1.3rem;line-height:1.2}.rk-stat span{font-size:.84rem;font-weight:600;color:var(--ink)}.rk-stat small{font-size:.74rem;color:var(--muted)}
+.rk-stat.bad{border-color:var(--seal)}.rk-stat.bad b{color:var(--seal)}.rk-stat.warn{background:var(--warn-soft)}.rk-stat.warn b{color:var(--warn)}
 .note{background:var(--surface2);border:1px dashed var(--line);border-radius:.6rem;padding:.6rem .8rem;font-size:.83rem;color:var(--ink2)}
 
 /* 홈 바로가기 */
@@ -881,7 +885,7 @@ var BD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.8.6';
+var APP_VER='1.9.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -891,7 +895,7 @@ function defaultState(){
     meeting:{type:'정기',date:'',time:'18:30',place:'입주자대표회의실',ruleOpen:'제○○조 제○항',ruleResult:'제○○조 제○항',
       noticeDate:'',resultDate:'',resultEnd:'',noticeLead:'5',noticeNo:'',resultNo:'',audience:DEFAULT_AUD},
     agendas:[],
-    risk:{url:''},
+    risk:{url:'',key:''},
     kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:''},
     safety:{ver:SP_VER,edits:{}},
     rules:rulesDefault(),
@@ -1363,6 +1367,7 @@ function renderHome(v){
       modCard('bid','입찰·계약','수의계약 판정, 입찰공고문, 선정결과 공고, 기한 계산','on','사용 가능')+
       modCard('elect','동대표·선관위 선거','일정 역산, 선출공고, 선관위원 모집, 당선 기준','on','사용 가능')+
     '</div></section>'+
+    '<section class="card"><h2>위험성평가 현황 <small>이번 달</small></h2><div id="home-risk"></div></section>'+
     '<section class="card"><h2>다음 회의</h2><dl class="next"><dt>일시</dt><dd>'+esc(dParen(m.date))+' '+esc(tK(m.time))+'</dd><dt>장소</dt><dd>'+esc(m.place)+'</dd><dt>안건</dt><dd>'+state.agendas.length+'건</dd></dl>'+
       '<div class="row" style="margin-top:.8rem"><button type="button" class="btn" data-go="agenda">안건·공고 열기</button><button type="button" class="btn ghost" data-act="newmeeting">새 회의 시작</button></div>'+
       '<p class="muted" style="margin:.6rem 0 0">새 회의를 시작하면 안건을 비우고 회의일을 다음 달로 옮깁니다. 공고 번호와 공고일은 새로 입력하세요.</p></section>'+
@@ -1373,6 +1378,7 @@ function renderHome(v){
       '<p class="muted" style="margin:.6rem 0 0" id="resetmsg">입력한 내용은 이 브라우저에 자동 저장됩니다. 안전관리계획서에서 고친 칸 '+nEd+'개도 함께 저장됩니다. 중요한 자료는 내보내기로 파일을 따로 보관하세요.</p></section>'+
   '</div></div>';
   var f=$('#impfile');if(f)f.addEventListener('change',onImport);
+  homeRisk();
 }
 function modCard(id,t,d,cls,tg){return '<button type="button" class="mod" data-go="'+id+'"><b>'+t+'<span class="tag '+cls+'">'+tg+'</span></b><span>'+d+'</span></button>';}
 function memRows(){
@@ -3262,15 +3268,94 @@ function elAct(act,a){
 }
 
 /* 위험성평가 */
+/* ── 위험성평가 연동: 구글시트판의 읽기 전용 요약(?mode=summary&key=) ── */
+var riskSum=null,riskAt=0,riskBusy=null;
+function riskOk(){var u=(state.risk.url||'').trim();return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.test(u)&&String(state.risk.key||'').trim().length>=12;}
+function riskLoad(force){
+  if(!riskOk())return Promise.reject(new Error('nokey'));
+  if(!force&&riskSum&&Date.now()-riskAt<5*60000)return Promise.resolve(riskSum);
+  if(riskBusy)return riskBusy;
+  var u=state.risk.url.trim()+'?mode=summary&key='+encodeURIComponent(String(state.risk.key).trim());
+  riskBusy=fetch(u).then(function(r){return r.json();}).then(function(j){riskBusy=null;if(!j.ok)throw new Error(j.error||'읽지 못함');riskSum=j;riskAt=Date.now();return j;})
+    .catch(function(e){riskBusy=null;throw e;});
+  return riskBusy;
+}
+function riskErr(e){var m=String(e&&e.message||e);
+  return /nokey/.test(m)?'위험성평가 메뉴에서 웹앱 주소와 허브 연결 키를 넣으면 현황이 나옵니다.':/Unexpected token|JSON/.test(m)?'웹앱이 아직 예전 버전입니다. Code.gs를 v1.6으로 바꾸고 "새 버전"으로 배포하세요.':/Failed to fetch|NetworkError|Load failed/i.test(m)?'웹앱에 연결하지 못했습니다. 주소를 확인하세요.':m;}
+function rDot(d){var m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[2])+'. '+(+m[3])+'.':'';}
+function riskStats(j){
+  var L=j.logs,ok=function(a){return a&&a.length;};
+  return '<div class="rk-stats">'+
+    rkStat(j.imp.open,'개선대책 미완료',j.imp.late?'기한 지남 '+j.imp.late+'건':'기한 지난 것 없음',j.imp.late?'bad':'')+
+    rkStat(L.tbm+'회','이번 달 TBM',L.lastTbm?'마지막 '+rDot(L.lastTbm):'기록 없음',L.tbm?'':'warn')+
+    rkStat(ok(L.patrol)?'실시':'미실시','이번 달 순회점검',ok(L.patrol)?L.patrol.map(rDot).join(', '):'근로자 동행 점검',ok(L.patrol)?'':'warn')+
+    rkStat(ok(L.meeting)?'실시':'미실시','이번 달 근로자 회의',ok(L.meeting)?L.meeting.map(rDot).join(', '):'의견 청취·결과 공유',ok(L.meeting)?'':'warn')+
+    rkStat(j.rep.open,'처리 안 된 신고',j.rep.need?'수시평가 검토 '+j.rep.need+'건':'QR·근로자 의견',j.rep.need?'bad':'')+
+  '</div>';
+}
+function rkStat(n,t,s,c){return '<div class="rk-stat'+(c?' '+c:'')+'"><b>'+esc(String(n))+'</b><span>'+esc(t)+'</span><small>'+esc(s)+'</small></div>';}
+function homeRisk(){
+  var box=$('#home-risk');if(!box)return;
+  if(!riskOk()){box.innerHTML=state.risk.url?'<p class="muted" style="margin:0">위험성평가 메뉴에 "허브 연결 키"를 넣으면 이곳에 이번 달 현황이 나옵니다.</p>':'';box.closest('section').hidden=!state.risk.url;return;}
+  box.innerHTML='<p class="muted" style="margin:0">위험성평가 현황을 읽는 중…</p>';
+  riskLoad().then(function(j){
+    box.innerHTML=riskStats(j)+(j.tasks.length?'<p style="margin:.6rem 0 0;font-size:.88rem"><b>이번 달 할 일</b> · '+j.tasks.map(esc).join(' · ')+'</p>':'')+
+      '<div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-go="risk">위험성평가 열기</button><span class="muted" style="font-size:.8rem">'+esc(j.today)+' 기준</span></div>';
+  }).catch(function(e){box.innerHTML='<p class="note" style="margin:0">'+esc(riskErr(e))+'</p>';});
+}
+function paintRiskSum(force){
+  var box=$('#risksum');if(!box)return;
+  if(!riskOk()){box.innerHTML='<p class="muted" style="margin:0">시트 메뉴 <b>[안전관리] → [허브 연결 키 보기]</b>에서 키를 받아 위 칸에 넣으면, 이곳에 현황과 개선대책 목록이 나오고 입대의 안건·결과 공유 공지문을 바로 만들 수 있습니다.</p>';return;}
+  box.innerHTML='<p class="muted" style="margin:0">읽는 중…</p>';
+  riskLoad(force).then(function(j){
+    var L=j.imp.list;
+    box.innerHTML=riskStats(j)+
+      '<h3 style="margin:1rem 0 .4rem;font-size:.95rem">진행 중인 개선대책 '+j.imp.open+'건 <small class="muted">(전체 '+j.imp.total+' · 완료 '+j.imp.done+')</small></h3>'+
+      (L.length?'<div style="overflow-x:auto"><table class="kt"><thead><tr><th>예정일</th><th>대상 · 개선대책</th><th>담당</th><th>예산·방법</th></tr></thead><tbody>'+L.map(function(x){
+        var late=x.due&&x.due<j.today;return '<tr><td style="white-space:nowrap'+(late?';color:var(--seal);font-weight:700':'')+'">'+esc(x.due||'-')+(late?'<br><small>기한 지남</small>':'')+'</td><td><b>'+esc(x.t)+'</b><br><small>'+esc(x.m)+'</small>'+(x.temp?'<br><small class="muted">임시조치: '+esc(x.temp)+'</small>':'')+'</td><td>'+esc(x.who)+'</td><td><small>'+esc(x.budget)+'</small></td></tr>';}).join('')+'</tbody></table></div>':'<p class="muted">진행 중인 개선대책이 없습니다.</p>')+
+      '<div class="row" style="margin-top:.8rem"><button type="button" class="btn" data-act="rkagenda">개선대책 이행 안건 넣기</button><button type="button" class="btn ghost" data-act="rkshare">결과 공유 공지문 복사</button><button type="button" class="btn ghost sm" data-act="rkreload">새로 읽기</button></div>'+
+      '<p class="muted" style="font-size:.8rem;margin:.4rem 0 0">'+esc(j.apt)+' 구글시트에서 '+esc(j.today)+'에 읽음 · 허브는 읽기만 하고 시트를 바꾸지 않습니다.</p>';
+  }).catch(function(e){box.innerHTML='<p class="note" style="margin:0">'+esc(riskErr(e))+'</p>';});
+}
+function rkAct(act){
+  if(act==='rkreload'){paintRiskSum(true);return true;}
+  if(act!=='rkagenda'&&act!=='rkshare')return false;
+  riskLoad().then(function(j){
+    var L=j.imp.list,y=j.annual.year;
+    if(act==='rkagenda'){
+      var need=L.filter(function(x){return /입대의|의결|구입|공사|견적|설치/.test(x.budget+x.m);});
+      if(!need.length){toast('입대의 의결이 필요한 개선대책이 없습니다.');return;}
+      var t='위험성평가 개선대책 이행(개선공사·물품 구입) 승인의 건';
+      var dd=['근거: 산업안전보건법 제36조, 같은 법 시행규칙 제37조의4 (개선대책 수립 내용 및 이행 결과 기록)',
+        y+'년 정기 위험성평가'+(j.annual.base?'('+y+'. '+rDot(j.annual.base)+' 실시)':'')+'에서 나온 개선대책 중 비용이 드는 '+need.length+'건',
+      ].concat(need.map(function(x,i){return (i+1)+'. '+x.t+': '+x.m+(x.due?' (예정 '+x.due+')':'')+(x.budget?' — '+x.budget:'');}))
+       .concat(['완료 전까지 임시조치를 유지하며, 완료 후 완료일·개선 후 사진을 기록합니다.']).join('\n');
+      state.agendas.push({title:t,result:'가결',discuss:dd,resolution:'위험성평가 개선대책 '+need.length+'건의 이행(견적 비교 후 시행)을 원안대로 의결함.'});
+      save();toast('안건·공고에 "'+t+'"을(를) 넣었습니다. 금액은 견적 후 고쳐 쓰세요.');
+    }else{
+      var txt='[위험성평가 결과 공유]\n\n'+(j.apt||state.complex.name)+' 관리사무소는 '+y+'년 정기 위험성평가를 실시하였으며, 그 결과를 아래와 같이 알려 드립니다.\n\n'+
+        '1. 실시일: '+(j.annual.base?rDot(j.annual.base).replace(/^/,y+'. '):y+'.  .  .')+' 현장 순회점검(근로자 참여)\n'+
+        '2. 평가 범위: 현장점검 '+(j.annual.chk||'')+'개 항목 및 추가 위험요인\n'+
+        '3. 개선이 필요한 위험요인과 대책\n'+(L.length?L.map(function(x){return ' - '+x.t+': '+x.m+(x.due?' (예정 '+x.due+')':'');}).join('\n'):' - 없음')+'\n'+
+        '4. 완료 전 임시조치\n'+(L.filter(function(x){return x.temp;}).map(function(x){return ' - '+x.t+': '+x.temp;}).join('\n')||' - 없음')+'\n\n'+
+        '작업 전 TBM에서 해당 위험요인과 안전수칙을 계속 확인하겠습니다. 위험한 곳이나 아차사고는 QR 신고 또는 관리사무소로 알려 주십시오.\n\n'+
+        '근거: 산업안전보건법 제36조, 같은 법 시행규칙 제37조의3(결과 공유)\n\n'+(j.apt||state.complex.name)+' 관리사무소장 '+(j.director||state.complex.director||'');
+      copyText(txt);
+    }
+  }).catch(function(e){toast(riskErr(e));});
+  return true;
+}
 function canFrame(){var h=location.hostname||'';return /github\.io$/.test(h)||h==='localhost'||h==='127.0.0.1';}
 function renderRisk(v){
   v.innerHTML=
   '<h1 class="h-title">위험성평가</h1><p class="lead">구글시트로 만든 위험성평가 관리 시스템을 이 허브에서 엽니다. 기록은 소장님 구글시트에 쌓이고, 직원 여럿이 같이 입력하며, QR 신고와 메일 알림도 그대로 동작합니다.</p>'+
   '<section class="card"><h2>연결 주소</h2>'+
     F('웹앱 주소 (Apps Script 배포 주소)','risk.url',state.risk.url,{type:'url',ph:'https://script.google.com/macros/s/.../exec',hint:'설치 안내서의 마지막 단계에서 받은 주소를 붙여넣으세요.'})+
+    F('허브 연결 키','risk.key',state.risk.key||'',{ph:'시트 메뉴 [안전관리] → [허브 연결 키 보기]',hint:'현황을 읽기만 하는 키입니다(관리자 PIN이 아님). 이 브라우저에만 저장되고 사이트에는 올라가지 않습니다.'})+
     '<div class="row" style="margin-top:.8rem" id="riskact"></div></section>'+
+  '<section class="card"><h2>이번 달 현황 <small>구글시트에서 읽어 옴</small></h2><div id="risksum"></div></section>'+
   '<div id="riskframe" style="margin-top:1rem"></div>';
-  paintRisk();
+  paintRisk();paintRiskSum();
 }
 function paintRisk(){
   var a=$('#riskact');if(!a)return;var u=(state.risk.url||'').trim();var ok=/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.test(u);
@@ -3305,7 +3390,8 @@ function onInput(e){
   if(tab==='bid'&&/^bids\.\d+\./.test(b)){var bk=b.replace(/^bids\.\d+\./,'');if(/^cos\./.test(bk)){scCells();return;}if(bk==='kind'){var bq=BQ(),kk=BD.kind(bq.kind);bq.award='';bq.eval=evalDefault(bq.kind);bq.sui=(bq.sui||[]).filter(function(n){return !BD.suiFit(+n,kk,0)||+n===6;});}
     if(/^(kind|path|amtMode|site|type|award|pt\.on)$/.test(bk)){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);}else{refreshBid();}return;}
   if(b.indexOf('complex.')===0)updateChip();
-  if(b==='risk.url')paintRisk();
+  if(b==='risk.url'){paintRisk();riskSum=null;paintRiskSum();}
+  if(b==='risk.key'){riskSum=null;clearTimeout(window._rkT);window._rkT=setTimeout(function(){paintRiskSum(true);},600);}
   if(b==='meeting.resultDate'&&!state.meeting.resultEnd){state.meeting.resultEnd=addDays(el.value,7);var re=$('#f-meeting-resultEnd');if(re)re.value=state.meeting.resultEnd;}
   if(tab==='agenda')refreshPreview();
   if(tab==='rules'&&b.indexOf('rules.')===0&&b!=='rules.diag.why')refreshRules();
@@ -3330,6 +3416,7 @@ function onClick(e){
   if(act.indexOf('rl')===0&&rlAct(act,a))return;
   if(act.indexOf('bd')===0&&bdAct(act,a))return;
   if(act.indexOf('el')===0&&elAct(act,a))return;
+  if(act.indexOf('rk')===0&&rkAct(act))return;
   if(act==='addag'){state.agendas.push({title:'',result:'가결',discuss:'',resolution:''});save();renderAgList();refreshPreview();var inp=$$('#aglist .ag-h input');if(inp.length)inp[inp.length-1].focus();}
   else if(act==='agdel'){state.agendas.splice(i,1);save();renderAgList();refreshPreview();}
   else if(act==='agup'&&i>0){var t=state.agendas[i];state.agendas[i]=state.agendas[i-1];state.agendas[i-1]=t;save();renderAgList();refreshPreview();}
