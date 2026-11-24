@@ -1374,7 +1374,7 @@ var LT=(function(){
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.13.1';
+var APP_VER='1.13.2';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -4433,7 +4433,7 @@ function ltFldList(){var L=LQ(),yrs=L.fld.yrs||'3',cy=new Date().getFullYear();r
 function ltFld(){var box=$('#lt-fld');if(!box)return;var F=ltFldList(),L=LQ();
   if(!F.length){box.innerHTML='<p class="muted">대상 시설이 없습니다.</p>';return;}
   var n=F.filter(function(f){return (L.fst[f.k]||{}).st;}).length;
-  box.innerHTML='<p class="muted" style="margin:0 0 .4rem">'+F.length+'개 중 '+n+'개 점검함</p><ul class="chk">'+F.map(function(f){return '<li class="'+((L.fst[f.k]||{}).st?'ok':'warn')+'"><b>'+(f.nx?f.nx.y:'-')+'</b><span style="flex:1"><b>'+esc(f.n)+'</b> <span class="muted">'+esc([f.g,f.loc,f.spec].filter(Boolean).join(' · '))+'</span>'+(f.nx?'<br><span style="font-size:.8rem">예정: '+f.nx.y+'년 '+f.nx.m+(f.nx.m==='부분'?' '+f.nx.p+'%':'')+' '+LT.won(f.nx.a)+'원</span>':'')+ltFst(f)+'</span></li>';}).join('')+'</ul>';}
+  box.innerHTML='<p class="muted" style="margin:0 0 .4rem">'+F.length+'개 중 '+n+'개 점검함</p><ul class="chk">'+F.map(function(f){return '<li class="'+((L.fst[f.k]||{}).st?'ok':'warn')+'"><b>'+((L.fst[f.k]||{}).st?'✓':'!')+'</b><span style="flex:1"><span style="display:inline-block;font-weight:700;color:var(--accent);margin-right:.4rem">'+(f.nx?f.nx.y+'년':'-')+'</span><b>'+esc(f.n)+'</b> <span class="muted">'+esc([f.g,f.loc,f.spec].filter(Boolean).join(' · '))+'</span>'+(f.nx?'<br><span style="font-size:.8rem">예정: '+f.nx.y+'년 '+f.nx.m+(f.nx.m==='부분'?' '+f.nx.p+'%':'')+' '+LT.won(f.nx.a)+'원</span>':'')+ltFst(f)+'</span></li>';}).join('')+'</ul>';}
 function ltKh(){var L=LQ(),box=$('#lt-kh');if(!box)return;if(!L.kh.length){box.innerHTML='';return;}
   var F=LT.facilities(L.items),opt=function(sel){return '<option value="">(연결 안 함)</option>'+F.map(function(f){return '<option value="'+esc(f.k)+'"'+(f.k===sel?' selected':'')+'>'+esc(f.n+(f.loc?' · '+f.loc:'')+(f.spec?' · '+f.spec:''))+'</option>';}).join('');};
   var todo=L.kh.filter(function(h){return !h.done;}).length;
