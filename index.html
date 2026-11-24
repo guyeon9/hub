@@ -1286,9 +1286,85 @@ var LT=(function(){
   }
   var HEAD=['연도','수선방법','수선율','공사종별','구분','위치','규격','수량','단위','금액'];
   function itemsToRows(items){return [HEAD].concat((items||[]).slice().sort(function(a,b){return a.y-b.y;}).map(function(x){return [+x.y,x.m,num(x.p),x.n,x.g||'',x.loc||'',x.spec||'',num(x.q)&&String(num(x.q))===String(x.q).replace(/,/g,'')?num(x.q):(x.q||''),x.u||'',Math.round(num(x.a))];}));}
+  /* ── 3단계: 몰림 감지·과거 이력·요율 ── */
+  /* 과거(계획 시작 전) 전면 시행 → 다음 전면 = 시행연도 + 주기로 이후 회차를 옮김 */
+  function applyPast(items,key,y,cyc){
+    var fut=items.filter(function(x){return fkey(x)===key&&x.m!=='부분'&&!x.done&&+x.y>y;}).sort(function(a,b){return a.y-b.y;});
+    if(!fut.length||!cyc)return {ok:false,msg:'옮길 다음 전면 회차가 없습니다.'};
+    var t=fut[0],to=y+num(cyc),d=to-t.y;if(!d)return {ok:true,d:0,msg:t.n+': 다음 전면 '+t.y+'년이 이미 '+y+'년 시행 + '+cyc+'년과 맞습니다.'};
+    var from=+t.y;items.forEach(function(x){if(fkey(x)===key&&!x.done&&+x.y>=from)x.y=+x.y+d;});
+    return {ok:true,d:d,from:from,to:to,msg:t.n+': '+y+'년 시행 → 다음 전면 '+from+'년을 '+to+'년으로 ('+(d>0?d+'년 늦춤':(-d)+'년 당김')+', 이후 회차도 함께)'};
+  }
+  /* 시설별 별표1 전면 주기 */
+  function fullCyc(n,g){var h=b1For(n,g).filter(function(b){return /전면|전체/.test(b.m);})[0];return h?h.c:0;}
+  /* 이력 한 줄 → 계획 시설 찾기 */
+  function matchHist(h,items){
+    var F=facilities(items),hb=b1For(h.n,h.g)[0],hn=np(h.n),best=null,bs=0;
+    F.forEach(function(f){var s=0,fb=b1For(f.n,f.g)[0];
+      if(hb&&fb&&hb.n===fb.n&&nz(hb.s)===nz(fb.s))s+=6;
+      if(np(f.n)===hn)s+=5;else if(hn.length>=2&&(np(f.n).indexOf(hn)>=0||hn.indexOf(np(f.n))>=0))s+=3;
+      if(nz(f.g)===nz(h.g))s+=1;
+      if(h.dong&&f.loc&&nz(f.loc).indexOf(nz(h.dong))>=0)s+=1;
+      if(s>bs){bs=s;best=f;}});
+    return bs>=5?best:null;
+  }
+  var HCOL=[['area',/^(분야)/],['cost',/^(공사비용|비용)/],['g',/^(구분)/],['n',/^(공사종별)/],['m',/^(수선방법)/],['c',/^(수선주기|주기)/],['dong',/^(동|관리대상|동구분)/],['t',/^(공사내용)/],['d',/^(공사시작일|공사기간|시작일|공사일)/],['a',/^(금액|계약금액|실공사금액)/]];
+  function histFromRows(rows){
+    rows=(rows||[]).filter(function(r){return r&&r.some(function(x){return String(x==null?'':x).trim();});});
+    var hi=-1;for(var i=0;i<Math.min(rows.length,20);i++){var hs=rows[i].map(function(x){return String(x==null?'':x).replace(/\s/g,'');});if(hs.some(function(x){return /^공사종별/.test(x);})&&hs.some(function(x){return /^(공사시작일|공사기간|시작일)/.test(x);})){hi=i;break;}}
+    if(hi<0)return {list:[],err:'첫 줄에 공사종별, 공사 시작일 칸이 있어야 합니다.'};
+    var hd=rows[hi].map(function(x){return String(x==null?'':x).replace(/\s/g,'');}),ix={};HCOL.forEach(function(c){var j=hd.findIndex(function(h){return c[1].test(h);});if(j>=0)ix[c[0]]=j;});
+    var out=[];rows.slice(hi+1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim();};
+      var ds=g('d'),y=0,mm=ds.match(/(\d{4})[-.\/년\s]*(\d{1,2})?/);if(mm)y=+mm[1];else if(/^\d{5}$/.test(ds)){var dt=new Date(Date.UTC(1899,11,30)+num(ds)*864e5);y=dt.getUTCFullYear();ds=dt.toISOString().slice(0,10);}
+      if(!y||!g('n'))return;out.push({id:'h'+(k+1),area:g('area'),cost:g('cost'),g:g('g'),n:g('n'),m:g('m'),c:g('c'),dong:g('dong'),t:g('t'),d:ds,y:y,a:Math.round(num(g('a')))});});
+    return {list:out,err:out.length?'':'읽을 줄이 없습니다.'};
+  }
+  /* 정기검토 다음 해 몰림 감지 */
+  function bunch(items,M,hist){
+    var Y=byYear(items),ys=Object.keys(Y).map(Number).sort(function(a,b){return a-b;});if(!ys.length)return null;
+    var tots=ys.map(function(y){return Y[y].a;}).sort(function(a,b){return a-b;}),med=tots[Math.floor(tots.length/2)]||1;
+    var rv=parseInt(String(M.review||'').slice(0,4),10),nr=rv?rv+3:0,cand=[];
+    ys.forEach(function(y){var r=Y[y].a/med;if((nr&&y===nr+1&&r>=1.5)||r>=5)cand.push({y:y,a:Y[y].a,n:Y[y].n,ratio:r,afterReview:!!(nr&&y===nr+1)});});cand.sort(function(a,b){return (b.afterReview-a.afterReview)||(b.ratio-a.ratio);});cand=cand.slice(0,2);
+    var uy=parseInt(String(M.use||'').slice(0,4),10)||0,hk={};(hist||[]).forEach(function(h){(h.ks||(h.k?[h.k]:[])).forEach(function(k){if(h.m!=='부분')hk[k]=Math.max(hk[k]||0,h.y);});});
+    cand.forEach(function(c){c.items=items.filter(function(x){return +x.y===c.y;}).map(function(x){
+        var k=fkey(x),cy=x.m==='부분'?0:fullCyc(x.n,x.g),due=0,tag='',last=hk[k]||0;
+        if(last&&cy)due=last+cy;else if(uy&&cy){due=uy+Math.floor((c.y-uy)/cy)*cy;}
+        if(x.m==='부분')tag='부분수선';else if(last&&cy){var kk=Math.floor((c.y-last)/cy),d1=last+kk*cy;due=d1===c.y?d1:d1+cy;tag=d1===c.y?'이력과 맞음 ('+last+'년 시행 + '+cy+'년 주기)':'이력상 다음은 '+(d1+cy)+'년이면 됨 ('+last+'년 시행)';}
+        else if(due&&cy){tag=due===c.y?'주기상 맞음':'사용검사 기준 주기로는 '+due+'년 → 미뤄 온 공사일 수 있음';}else tag='별표1에 전면 주기가 없는 항목 → 현장 상태로 판단';
+        return {x:x,k:k,cy:cy,due:due,tag:tag,moved:/미뤄 온|이력상 다음은/.test(tag)};}).sort(function(a,b){return num(b.x.a)-num(a.x.a);});
+      c.movedA=c.items.filter(function(i){return i.moved;}).reduce(function(s,i){return s+num(i.x.a);},0);});
+    return {med:med,nextReview:nr,list:cand};
+  }
+  /* 관리규약 적립요율 개정안 (영 제31조제1항) */
+  function ym(s){var m=String(s||'').match(/(\d{4})\D*(\d{1,2})?/);return m?{y:+m[1],m:+(m[2]||1)}:null;}
+  function months(a,b){a=ym(a);b=ym(b);if(!a||!b)return 0;return (b.y-a.y)*12+(b.m-a.m)+1;}
+  function rateSolve(items,base,M,opt){
+    opt=opt||{};var area=num(M.area),T0=num(opt.total0),rr=(opt.rows||[]).filter(function(r){return r.from&&r.to;}),np2=(opt.periods||[]).filter(function(p){return p.from&&p.to;});
+    if(!area||!T0||!np2.length)return null;
+    var ap=ym(np2[0].from),apY=ap.y,min=num(opt.min);
+    var fut=function(arr){return (arr||[]).reduce(function(s,x){return s+(+x.y>=apY?num(x.a):0);},0);};
+    var F0=fut(base&&base.length?base:items),F1=fut(items),T1=Math.max(1,T0-F0+F1);
+    var cur=rr.map(function(r){var mo=months(r.from,r.to);return {from:r.from,to:r.to,r:num(r.r),mo:mo,u:mo?Math.round(T0*num(r.r)/100/(area*mo)*100)/100:0};});
+    var fixed=[];cur.forEach(function(r){var t=ym(r.to),f=ym(r.from);if(t.y<apY||(t.y===apY&&t.m<ap.m))fixed.push(r);else if(f.y<apY||(f.y===apY&&f.m<ap.m)){var pm=ap.m-1,py=ap.y;if(pm<1){pm=12;py--;}var to=py+'-'+String(pm).padStart(2,'0'),mo=months(r.from,to);fixed.push({from:r.from,to:to,mo:mo,u:r.u,r:Math.round(r.r*mo/r.mo*100)/100,part:1});}});
+    var fixR=fixed.reduce(function(s,r){return s+r.r;},0);
+    var pre=cur.map(function(r){return {from:ym(r.from).y,to:Math.min(ym(r.to).y,apY-1),u:r.u};}).filter(function(r){return r.to>=r.from;});
+    var mk=function(us){return pre.concat(np2.map(function(p,i){return {from:ym(p.from).y,to:ym(p.to).y,u:us[i]};}));};
+    var endY=ym(np2[np2.length-1].to).y;
+    var sim=function(us){return simulate(items,{area:area,bal:M.bal,balDate:M.balDate,rates:mk(us),intr:M.intr,esc:M.esc,priceY:M.priceY,done:M.done,end:Math.max(endY,num(M.end))});};
+    var ok=function(us){return sim(us).rows.filter(function(r){return r.y>=apY;}).every(function(r){return r.close>=min;});};
+    var given=np2.map(function(p){return num(p.u);}),blank=given.map(function(u){return !u;}),flat=0;
+    if(blank.some(Boolean)){var lo=0,hi=20000,f=function(u){return given.map(function(g,i){return blank[i]?u:g;});};
+      if(ok(f(0)))hi=0;else{for(var k=0;k<40;k++){var mid=(lo+hi)/2;if(ok(f(mid)))hi=mid;else lo=mid;}}flat=Math.ceil(hi*100)/100;given=f(flat);}
+    var out=np2.map(function(p,i){var mo=months(p.from,p.to);return {from:p.from,to:p.to,mo:mo,u:given[i],auto:blank[i],r:given[i]*area*mo/T1*100};});
+    var sumR=fixR+out.reduce(function(s,o){return s+o.r;},0),adj=null,last=out[out.length-1];
+    if(opt.fill100!==false&&sumR<100){var add=100-sumR;adj={r0:last.r,u0:last.u};last.r+=add;last.u=Math.round(T1*last.r/100/(area*last.mo)*100)/100;sumR=100;}
+    var cum=fixR;out.forEach(function(o){o.r=Math.round(o.r*100)/100;cum+=o.r;o.cum=Math.round(cum*100)/100;});
+    var S=sim(out.map(function(o){return o.u;}));
+    return {T0:T0,F0:F0,F1:F1,T1:T1,cur:cur,fixed:fixed,fixR:Math.round(fixR*100)/100,out:out,flat:flat,sumR:Math.round(sumR*100)/100,adj:adj,sim:S,over:sumR>100.005,ok:S.rows.filter(function(r){return r.y>=apY;}).every(function(r){return r.close>=min;})};
+  }
 
   return {B1:B1,B1_VER:B1_VER,nz:nz,np:np,b1For:b1For,num:num,won:won,eok:eok,parseCSV:parseCSV,itemsFromCSV:itemsFromCSV,itemsToCSV:itemsToCSV,byYear:byYear,facilities:facilities,fkey:fkey,check:check,unitAt:unitAt,simulate:simulate,law31:law31,diff:diff,small:small,
-    LH:LH,lhRef:lhRef,minu:minu,GG_VER:GG_VER,ggCost:ggCost,ggList:ggList,unitPrices:unitPrices,median:median,pricesFor:pricesFor,facsFromItems:facsFromItems,facsFromB1:facsFromB1,genPlan:genPlan,estimate:estimate,winA:winA,xlsxRows:xlsxRows,xlsxBlob:xlsxBlob,itemsToRows:itemsToRows,itemsFromRows:itemsFromRows,HEAD:HEAD,applyHist:applyHist,level:level,defLock:defLock};
+    LH:LH,lhRef:lhRef,minu:minu,GG_VER:GG_VER,ggCost:ggCost,ggList:ggList,unitPrices:unitPrices,median:median,pricesFor:pricesFor,facsFromItems:facsFromItems,facsFromB1:facsFromB1,genPlan:genPlan,estimate:estimate,applyPast:applyPast,fullCyc:fullCyc,matchHist:matchHist,histFromRows:histFromRows,bunch:bunch,rateSolve:rateSolve,months:months,winA:winA,xlsxRows:xlsxRows,xlsxBlob:xlsxBlob,itemsToRows:itemsToRows,itemsFromRows:itemsFromRows,HEAD:HEAD,applyHist:applyHist,level:level,defLock:defLock};
 })();
 
 
@@ -1298,7 +1374,7 @@ var LT=(function(){
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.12.0';
+var APP_VER='1.13.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -3786,11 +3862,11 @@ function ltmDefault(){return {
   adj:{kind:'정기',date:'',meet:'',no:'',reason:'',total:'',agree:''},
   use:{y:'',ids:[],name:'',loc:'',draw:'',period:'',method:'',scope:'',amt:'',order:'',yearUsed:'',meet:'',date:''},
   pub:{y:'',open:'',actual:'',intr:'',uses:[{n:'',d:'',a:''}],place:'',date:''},
-  facs:[],wiz:{from:'',to:'',std:true,only:false,psrc:'',py:''},prices:[],pesc:'',hist:[],fst:{},lv:{min:'',max:'3'},est:{plan:'계단식',floors:'',pk:'',pkA:'30',elev:'',cctv:''},
-  ui:{v:'items',fy:'',doc:'adj'}
+  facs:[],wiz:{from:'',to:'',std:true,only:false,psrc:'',py:''},prices:[],pesc:'',hist:[],fst:{},lv:{min:'',max:'3'},est:{plan:'계단식',floors:'',pk:'',pkA:'30',elev:'',cctv:''},guide:{},kh:[],rr:[],t0:'',np:[],fld:{yrs:'3'},
+  ui:{v:'guide',fy:'',doc:'adj'}
 };}
 function LQ(){if(!state.ltm||!state.ltm.meta)state.ltm=merge(ltmDefault(),state.ltm||{});return state.ltm;}
-var LT_V=[['items','계획 항목'],['new','작성·재작성'],['price','단가표'],['sim','재원·평준화'],['chk','시설 검토'],['adj','검토·조정 서류'],['use','충당금 사용계획서'],['pub','적립·사용 공개']];
+var LT_V=[['guide','진행 안내'],['items','계획 항목'],['new','작성·재작성'],['price','단가표'],['field','이력·현장 점검'],['chk','시설 검토'],['sim','재원·평준화'],['adj','검토·조정 서류'],['use','충당금 사용계획서'],['pub','적립·사용 공개']];
 function ltNum(v){return LT.num(v);}
 function ltU(u){u=LT.num(u);return u%1?u.toFixed(2).replace(/0$/,''):LT.won(u);}
 function ltToday(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -3821,7 +3897,7 @@ function ltRev(){
 function ltPaint(){
   var L=LQ(),v=L.ui.v||'items',box=$('#ltv');if(!box)return;
   $$('#lttabs button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.ltv===v));});
-  ({items:ltItemsView,'new':ltNewView,price:ltPriceView,sim:ltSimView,chk:ltChkView,adj:ltAdjView,use:ltUseView,pub:ltPubView}[v]||ltItemsView)(box);
+  ({guide:ltGuideView,field:ltFieldView,items:ltItemsView,'new':ltNewView,price:ltPriceView,sim:ltSimView,chk:ltChkView,adj:ltAdjView,use:ltUseView,pub:ltPubView}[v]||ltItemsView)(box);
 }
 /* ── 계획 항목 ── */
 function ltYears(){var Y=LT.byYear(LQ().items);return Object.keys(Y).map(Number).sort(function(a,b){return a-b;});}
@@ -3867,7 +3943,7 @@ function ltSimView(box){
     CHK('잔액 기준월이 속한 해의 계획 공사는 이미 집행함 (그 해 공사비 빼고 계산)','ltm.meta.done',M.done)+
   '</section>'+
   '<section class="card"><h2>결과</h2><div id="lt-simout"></div></section>'+
-  ltLevelCard()+
+  ltBunchCard()+ltLevelCard()+ltRateCard()+
   '<section class="card"><h2>세대 유형별 월 부과액 <small>공급면적 × 단가</small></h2><div id="lt-types"></div><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="lttype">유형 추가</button></div><div id="lt-typeout" style="margin-top:.6rem"></div></section>';
   ltRates();ltTypes();ltSimOut();
 }
@@ -4306,6 +4382,163 @@ function ltReadFile(f,done){
 }
 function ltXlsxSave(name,rows,widths){if(typeof JSZip==='undefined'){toast('엑셀 부품이 준비되지 않았습니다.');return;}LT.xlsxBlob(rows,JSZip,widths).then(function(b){saveFile(name,b);});}
 
+/* ── 3단계: 진행 안내 ── */
+function ltFacList(){var L=LQ();return LT.facilities(L.items).map(function(f){var fut=L.items.filter(function(x){return LT.fkey(x)===f.k&&!x.done;}).sort(function(a,b){return a.y-b.y;});f.nx=fut.filter(function(x){return +x.y>=new Date().getFullYear();})[0]||null;return f;});}
+function ltGuideSteps(){
+  var L=LQ(),M=L.meta,G=L.guide,cy=new Date().getFullYear(),F=ltFacList();
+  var win=F.filter(function(f){return f.nx&&+f.nx.y<=cy+3;}),stN=win.filter(function(f){return (L.fst[f.k]||{}).st;}).length;
+  var C=L.items.length?LT.check(L.items,L.na):{items:[]},wr=C.items.filter(function(r){return r.lv==='warn';}),wrN=wr.filter(function(r){return (L.fst[r.f.k]||{}).memo;}).length;
+  var S=ltNum(M.area)&&M.balDate&&L.items.length?ltSim():null,B=L.items.length?LT.bunch(L.items,M,L.hist):null;
+  var D=LT.diff(L.base,L.items),why=D.filter(function(d){return L.why[d.id]||L.adj.reason;}).length;
+  var st=function(done,part){return done?'done':(part?'doing':'todo');};
+  return [
+    {k:'pre',t:'사전 확인',d:'계획서 비치, 최근 검토 이력, 설계도서(도면) 보관 여부를 확인합니다. 도면이 없으면 수량 확인이 어려우니 보관 상태부터 봅니다.',go:'items',s:st(L.items.length&&M.review&&ltNum(M.area)&&M.balDate&&G.dwg,L.items.length),info:(L.items.length?'계획 항목 '+L.items.length+'건':'계획서를 불러오세요')+(M.review?' · 최근 검토 '+M.review:'')+' · 도면 보관 '+(G.dwg?'확인함':'미확인'),chk:['dwg','설계도서(도면) 보관 확인']},
+    {k:'hist',t:'수선이력 반영',d:'K-apt 유지관리이력과 장충 사용 내역을 불러와, 실제로 한 공사부터 주기를 다시 셉니다.',go:'field',s:st(L.hist.length||L.kh.some(function(h){return h.done;}),L.kh.length),info:'반영한 이력 '+L.hist.length+'건'},
+    {k:'field',t:'현장 점검',d:'앞으로 3년 안에 예정된 시설을 현장에서 보고 상태(양호·보통·불량)와 의견을 적습니다. 점검표를 뽑아 들고 다녀도 됩니다.',go:'field',s:st(win.length&&stN>=win.length*0.9,stN),info:'3년 안 예정 시설 '+win.length+'개 중 '+stN+'개 점검',pct:win.length?stN/win.length:0},
+    {k:'b1',t:'수립기준(별표1) 검토',d:'주기·수선율이 별표1과 다른 곳마다 그대로 둘지 바꿀지 의견을 남깁니다.',go:'chk',s:st(!wr.length||wrN>=wr.length,wrN),info:'검토 필요 '+wr.length+'개 중 의견 '+wrN+'개',pct:wr.length?wrN/wr.length:1},
+    {k:'fin',t:'몰림·재원 검토',d:'정기검토 다음 해로 미뤄 둔 공사를 가려내고, 충당금이 모자라는 해를 평준화하거나 적립요율 개정안을 만듭니다.',go:'sim',s:st(S&&(!S.short.length||G.fin),S),info:(B&&B.list.length?B.list[0].y+'년 몰림 '+LT.eok(B.list[0].a)+' · ':'')+(S?'모자라는 해 '+S.short.length+'개':'기준 정보 필요'),chk:['fin','부족분 대책(평준화·요율) 결정']},
+    {k:'adj',t:'조정안 작성',d:'바뀐 항목마다 사유를 적으면 조정 대비표·안건·검토서가 만들어집니다(시행규칙 제7조제2항: 관리주체가 조정안 작성).',go:'adj',s:st(D.length&&why>=D.length,D.length),info:'조정 '+D.length+'건 · 사유 '+why+'건',pct:D.length?why/D.length:0},
+    {k:'vote',t:'입주자대표회의 의결',d:'조정안을 입대의 의결로 확정합니다. 3년이 되기 전 수시조정은 먼저 전체 입주자 과반수 서면동의가 필요합니다(법 제29조제3항).',go:'adj',s:st(L.adj.meet&&G.vote,L.adj.meet),info:L.adj.meet?'회의일 '+L.adj.meet:'회의일 미정',chk:['vote','의결 완료']},
+    {k:'keep',t:'기록·보관·고지',d:'검토사항을 기록·보관하고(법 제29조제2항, 안 하면 과태료), 조정 결과를 입주자에게 알립니다. 다음 검토 기준일을 새로 적습니다.',go:'adj',s:st(G.keep&&G.notice,G.keep||G.notice),info:'',chk2:[['keep','검토서·조정 계획서 보관'],['notice','조정 결과 입주자 고지']]}
+  ];
+}
+function ltGuideView(box){
+  var L=LQ(),n=ltNext(),S=ltGuideSteps(),done=S.filter(function(s){return s.s==='done';}).length;
+  var sch='';if(n){var due=new Date(n.y,n.m-1,1),f=function(k){var d=new Date(due.getFullYear(),due.getMonth()-k,1);return d.getFullYear()+'. '+(d.getMonth()+1)+'.';};
+    sch='<div style="overflow-x:auto;margin-top:.6rem"><table class="kt nw"><thead><tr><th>권장 시기</th><th>할 일</th></tr></thead><tbody>'+[[f(6),'검토 시작 · 이력 반영 · 단가 모으기'],[f(5)+' ~ '+f(3),'현장 점검 · 별표1 검토'],[f(2),'몰림·재원 검토 · 조정안 작성'],[f(1),'입대의 상정 · 의결'],[n.y+'. '+n.m+'.','검토 기한 (직전 검토 + 3년)']].map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('')+'</tbody></table></div>';}
+  box.innerHTML='<section class="card"><h2>정기검토 진행 안내 <small>LH 「장기수선계획 실무 가이드라인」 절차</small></h2>'+
+    '<p class="muted" style="margin:0 0 .4rem">위에서부터 차례로 하면 외주 없이 정기검토를 마칠 수 있습니다. 각 단계의 "열기"를 누르면 해당 화면으로 갑니다.</p>'+
+    '<div class="rk-stats">'+ltStat('진행',done+' / '+S.length+' 단계',done===S.length?'':'')+ltStat('검토 기한',n?n.s:'미정',n&&((n.y-new Date().getFullYear())*12+n.m-(new Date().getMonth()+1))<=6?'warn':'',n?'직전 검토 + 3년':'최근 정기검토 월을 넣으세요')+'</div>'+sch+'</section>'+
+  '<section class="card"><ol class="road" style="list-style:none;padding:0">'+S.map(function(s,i){
+    var badge=s.s==='done'?'<span class="tag on">완료</span>':s.s==='doing'?'<span class="tag link">진행 중</span>':'<span class="tag soon">할 일</span>';
+    var bar=s.pct!=null?'<div style="height:6px;background:var(--line);border-radius:3px;margin:.35rem 0;max-width:16rem"><div style="height:6px;width:'+Math.round(Math.min(1,s.pct)*100)+'%;background:var(--accent);border-radius:3px"></div></div>':'';
+    var chk=(s.chk?[s.chk]:[]).concat(s.chk2||[]).map(function(c){return '<label class="row" style="gap:.3rem;font-size:.85rem"><input type="checkbox" data-ltg="'+c[0]+'"'+(LQ().guide[c[0]]?' checked':'')+'> '+esc(c[1])+'</label>';}).join('');
+    return '<li style="border-top:1px solid var(--line);padding:.7rem 0"><div class="row" style="justify-content:space-between;align-items:flex-start"><div style="flex:1;min-width:14rem"><b>'+(i+1)+'. '+esc(s.t)+'</b> '+badge+'<p class="muted" style="margin:.25rem 0">'+esc(s.d)+'</p>'+bar+'<span style="font-size:.85rem">'+esc(s.info)+'</span>'+(chk?'<div class="row" style="margin-top:.3rem">'+chk+'</div>':'')+'</div><button type="button" class="btn ghost sm" data-ltv2="'+s.go+'">열기</button></div></li>';}).join('')+'</ol></section>';
+}
+/* ── 이력·현장 점검 ── */
+function ltFieldView(box){
+  var L=LQ(),yrs=L.fld.yrs||'3';
+  box.innerHTML='<section class="card"><h2>① K-apt 유지관리이력 넣기</h2>'+
+    '<p class="muted" style="margin:0 0 .5rem">K-apt(관리주체 로그인) → 유지관리이력의 내용을 엑셀로 정리한 파일을 불러오면 계획의 시설과 짝지어 줍니다. 열: 구분, 공사종별, 수선방법, 공사내용, 공사 시작일, 금액(공사비용·동은 있으면 좋음).</p>'+
+    '<div class="row"><button type="button" class="btn" data-act="lthload">이력 파일 불러오기 (엑셀·CSV)</button>'+(L.kh.length?'<button type="button" class="btn ghost sm" data-act="lthclear">불러온 이력 비우기</button>':'')+'</div><input type="file" id="lthfile" accept=".xlsx,.csv,.txt" hidden>'+
+    '<div id="lt-kh" style="margin-top:.6rem"></div></section>'+
+  '<section class="card"><h2>② 현장 점검 <small>상태와 의견은 시설 검토·검토서와 같이 쓰입니다</small></h2>'+
+    '<div class="row" style="align-items:flex-end"><label class="f" style="max-width:12rem"><span>대상</span><select id="lt-fy2"><option value="3"'+(yrs==='3'?' selected':'')+'>3년 안에 예정</option><option value="5"'+(yrs==='5'?' selected':'')+'>5년 안에 예정</option><option value="all"'+(yrs==='all'?' selected':'')+'>전체 시설</option></select></label><button type="button" class="btn" data-act="ltdocx" data-kind="field">점검표 Word로 저장</button></div>'+
+    '<div id="lt-fld" style="margin-top:.6rem"></div></section>';
+  var s=$('#lt-fy2');if(s)s.addEventListener('change',function(e){LQ().fld.yrs=e.target.value;save();ltFld();});
+  var f=$('#lthfile');if(f)f.addEventListener('change',ltHistImport);
+  ltKh();ltFld();
+}
+function ltFldList(){var L=LQ(),yrs=L.fld.yrs||'3',cy=new Date().getFullYear();return ltFacList().filter(function(f){return yrs==='all'||(f.nx&&+f.nx.y<=cy+(+yrs));}).sort(function(a,b){return (a.nx?a.nx.y:9999)-(b.nx?b.nx.y:9999);});}
+function ltFld(){var box=$('#lt-fld');if(!box)return;var F=ltFldList(),L=LQ();
+  if(!F.length){box.innerHTML='<p class="muted">대상 시설이 없습니다.</p>';return;}
+  var n=F.filter(function(f){return (L.fst[f.k]||{}).st;}).length;
+  box.innerHTML='<p class="muted" style="margin:0 0 .4rem">'+F.length+'개 중 '+n+'개 점검함</p><ul class="chk">'+F.map(function(f){return '<li class="'+((L.fst[f.k]||{}).st?'ok':'warn')+'"><b>'+(f.nx?f.nx.y:'-')+'</b><span style="flex:1"><b>'+esc(f.n)+'</b> <span class="muted">'+esc([f.g,f.loc,f.spec].filter(Boolean).join(' · '))+'</span>'+(f.nx?'<br><span style="font-size:.8rem">예정: '+f.nx.y+'년 '+f.nx.m+(f.nx.m==='부분'?' '+f.nx.p+'%':'')+' '+LT.won(f.nx.a)+'원</span>':'')+ltFst(f)+'</span></li>';}).join('')+'</ul>';}
+function ltKh(){var L=LQ(),box=$('#lt-kh');if(!box)return;if(!L.kh.length){box.innerHTML='';return;}
+  var F=LT.facilities(L.items),opt=function(sel){return '<option value="">(연결 안 함)</option>'+F.map(function(f){return '<option value="'+esc(f.k)+'"'+(f.k===sel?' selected':'')+'>'+esc(f.n+(f.loc?' · '+f.loc:'')+(f.spec?' · '+f.spec:''))+'</option>';}).join('');};
+  var todo=L.kh.filter(function(h){return !h.done;}).length;
+  box.innerHTML='<p class="muted" style="margin:0 0 .4rem">이력 '+L.kh.length+'건 · 처리 전 '+todo+'건. "주기 반영"은 그 시설을 그해에 전부 교체·도장했다는 뜻으로, 다음 회차를 시행연도 + 주기로 옮깁니다. 일부 수리는 "기록만"으로 두면 검토 의견에 남습니다. 계획 금액의 60% 이상·500만원 이상인 장충 전면 공사만 처음에 "주기 반영"으로 골라 두었으니, 연결된 시설이 맞는지 꼭 확인하세요.</p>'+
+    '<div style="overflow-x:auto;max-height:30rem"><table class="kt"><thead><tr><th>시행</th><th>공사(K-apt)</th><th style="text-align:right">금액</th><th>계획의 시설</th><th>처리</th></tr></thead><tbody>'+L.kh.map(function(h,i){
+      return '<tr'+(h.done?' style="opacity:.55"':'')+'><td style="white-space:nowrap">'+esc(String(h.d).slice(0,10))+'</td><td><b>'+esc(h.n)+'</b> <span class="muted">'+esc(h.m)+' · '+esc(h.cost||'')+'</span><br><span style="font-size:.8rem">'+esc(h.t)+'</span></td><td style="text-align:right;white-space:nowrap">'+LT.won(h.a)+'</td>'+
+        '<td><select data-ltkh="'+i+'" data-fld="k" style="max-width:15rem"'+(h.done?' disabled':'')+'>'+opt(h.k)+'</select></td><td>'+(h.done?'<span class="tag on">반영함</span>':'<select data-ltkh="'+i+'" data-fld="act">'+[['past','주기 반영'],['note','기록만'],['skip','빼기']].map(function(o){return '<option value="'+o[0]+'"'+(h.act===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>')+'</td></tr>';}).join('')+'</tbody></table></div>'+
+    (todo?'<div class="row" style="margin-top:.6rem"><button type="button" class="btn" data-act="lthapply">선택대로 반영</button><span class="muted">반영 전으로 되돌리기도 됩니다.</span></div>':'');}
+function ltHistImport(e){var f=e.target.files&&e.target.files[0];if(!f)return;e.target.value='';
+  ltReadFile(f,function(rows,t){var r=LT.histFromRows(rows||LT.parseCSV(t));if(r.err){toast(r.err);return;}var L=LQ(),F=LT.facilities(L.items);
+    r.list.forEach(function(h){var m=LT.matchHist(h,L.items);h.k=m?m.k:'';var fa=m?L.items.filter(function(x){return LT.fkey(x)===m.k&&x.m!=='부분';}).reduce(function(s,x){return Math.max(s,ltNum(x.a));},0):0;
+      h.act=!m?'skip':(/장기수선/.test(h.cost)&&/전면|전체/.test(h.m)&&h.a>=5000000&&(!fa||h.a>=fa*0.6)?'past':'note');});
+    L.kh=r.list.sort(function(a,b){return String(b.d).localeCompare(String(a.d));});saveNow();ltKh();toast('이력 '+r.list.length+'건을 불러와 '+r.list.filter(function(h){return h.k;}).length+'건을 계획의 시설과 짝지었습니다.');});}
+function ltHistApply(){
+  var L=LQ(),n=0,msgs=[];ltUndo=JSON.stringify(L);
+  var latest={};L.kh.forEach(function(h){if(!h.done&&h.act==='past'&&h.k&&(!latest[h.k]||h.y>latest[h.k].y))latest[h.k]=h;});
+  var cy0=new Date().getFullYear(),endY=ltNum(L.meta.end)||9999;
+  L.kh.forEach(function(h){if(h.done||h.act==='skip'||!h.k)return;var o=L.fst[h.k]=L.fst[h.k]||{},line=String(h.d).slice(0,7).replace('-','.')+' '+h.t+'('+LT.eok(h.a)+')';
+    if(h.act==='past'&&latest[h.k]!==h){line+=' · 더 최근 시행 이력이 있어 기록만';L.hist.push({k:h.k,ks:[h.k],y:h.y,m:'부분',a:h.a,t:'기록: '+line,at:ltToday()});o.memo=(o.memo?o.memo+' / ':'')+line;h.done=1;n++;return;}
+    if(h.act==='past'){var smp=L.items.filter(function(x){return LT.fkey(x)===h.k;})[0]||{},cyc0=LT.fullCyc(smp.n,smp.g)||(LT.facilities(L.items).filter(function(f){return f.k===h.k;})[0]||{}).cf||0;
+      if(cyc0&&h.y+cyc0<cy0&&!L.items.some(function(x){return LT.fkey(x)===h.k&&x.m!=='부분'&&!x.done&&Math.abs(+x.y-h.y)<=1;})){line+=' · '+(h.y+cyc0)+'년 주기 도래가 이미 지나 현장 확인 필요';L.hist.push({k:h.k,ks:[h.k],y:h.y,m:'전면',a:h.a,t:'기록: '+line,at:ltToday()});o.memo=(o.memo?o.memo+' / ':'')+line;h.done=1;n++;return;}}
+    if(h.act==='past'){var sample=L.items.filter(function(x){return LT.fkey(x)===h.k;})[0]||{},cyc=LT.fullCyc(sample.n,sample.g)||(LT.facilities(L.items).filter(function(f){return f.k===h.k;})[0]||{}).cf||0;
+      var near=L.items.filter(function(x){return LT.fkey(x)===h.k&&x.m!=='부분'&&!x.done&&Math.abs(+x.y-h.y)<=1;})[0],r;
+      if(near)r=LT.applyHist(L.items,h.k,h.y,'전면',h.a);else r=LT.applyPast(L.items,h.k,h.y,cyc);
+      msgs.push(r.msg);L.hist.push({k:h.k,ks:[h.k],y:h.y,m:'전면',a:h.a,t:r.msg,at:ltToday()});
+      if(r.ok&&r.d){L.items.forEach(function(x){if(LT.fkey(x)===h.k&&!L.why[x.id]&&+x.y>h.y)L.why[x.id]=h.y+'년 전면 시행(K-apt 유지관리이력) 반영'+(cyc?', 주기 '+cyc+'년':'');});}
+      line+=' · 주기 반영';var drop=L.items.filter(function(x){return LT.fkey(x)===h.k&&+x.y>endY;}).length;if(drop){L.items=L.items.filter(function(x){return !(LT.fkey(x)===h.k&&+x.y>endY);});msgs.push(drop+'회차가 계획 끝 연도를 넘어 빠짐');}}
+    else L.hist.push({k:h.k,ks:[h.k],y:h.y,m:'부분',a:h.a,t:'기록: '+line,at:ltToday()});
+    o.memo=(o.memo?o.memo+' / ':'')+line;h.done=1;n++;});
+  saveNow();ltPaint();toast(n?n+'건을 반영했습니다.'+(msgs.length?' 주기 반영 '+msgs.length+'건.':''):'반영할 이력이 없습니다.');
+}
+/* ── 몰림 감지 카드 ── */
+function ltBunchCard(){
+  var L=LQ(),B=L.items.length?LT.bunch(L.items,L.meta,L.hist):null;
+  if(!B||!B.list.length)return '<section class="card"><h2>몰림 감지</h2><p class="muted">특별히 몰린 해가 없습니다.</p></section>';
+  return '<section class="card"><h2>몰림 감지 <small>평년(가운데 값) '+LT.eok(B.med)+' 대비</small></h2>'+B.list.map(function(c){
+    return '<p style="margin:.2rem 0 .4rem"><b>'+c.y+'년 '+LT.eok(c.a)+'</b> ('+c.n+'건, 평년의 '+c.ratio.toFixed(1)+'배)'+(c.afterReview?' — <b style="color:var(--warn)">다음 정기검토('+B.nextReview+'년) 바로 다음 해</b>로, 결정을 미뤄 둔 공사가 모였을 가능성이 큽니다.':'')+'</p>'+
+      '<div style="overflow-x:auto;max-height:22rem"><table class="kt"><thead><tr><th>공사</th><th>방법</th><th style="text-align:right">금액</th><th>판단 근거</th></tr></thead><tbody>'+c.items.slice(0,40).map(function(i){var o=L.fst[i.k]||{};return '<tr><td>'+esc(i.x.n)+' <span class="muted">'+esc([i.x.loc,i.x.spec].filter(Boolean).join(' · '))+'</span>'+(o.st?' <span class="tag '+(o.st==='불량'?'soon':'on')+'">'+esc(o.st)+'</span>':'')+'</td><td>'+i.x.m+'</td><td style="text-align:right;white-space:nowrap">'+LT.won(i.x.a)+'</td><td style="font-size:.8rem'+(i.moved?';color:var(--warn)':'')+'">'+esc(i.tag)+'</td></tr>';}).join('')+'</tbody></table></div>'+
+      (c.movedA?'<p class="note" style="margin-top:.4rem">주기·이력으로 보아 그해가 아니어도 될 수 있는 공사가 '+LT.eok(c.movedA)+'입니다. 현장 점검으로 상태를 확인한 뒤 계획 항목에서 연도를 옮기거나 아래 평준화를 쓰세요.</p>':'');}).join('')+'</section>';
+}
+/* ── 적립요율 개정안 ── */
+function ltRateCard(){
+  var L=LQ(),M=L.meta;
+  var row=function(arr,path,i,ph){var r=arr[i];return '<tr><td><input type="text" data-bind="ltm.'+path+'.'+i+'.from" value="'+esc(r.from)+'" placeholder="2027-01" style="width:6rem"></td><td><input type="text" data-bind="ltm.'+path+'.'+i+'.to" value="'+esc(r.to)+'" placeholder="2028-12" style="width:6rem"></td><td><input type="text" data-bind="ltm.'+path+'.'+i+'.'+(path==='rr'?'r':'u')+'" value="'+esc(path==='rr'?r.r:r.u)+'" placeholder="'+ph+'" style="width:6rem"></td><td><button type="button" class="btn danger sm" data-act="ltrdel" data-p="'+path+'" data-i="'+i+'">빼기</button></td></tr>';};
+  return '<section class="card"><h2>관리규약 적립요율 개정안 <small>시행령 제31조제1항 · 관리규약 별표</small></h2>'+
+    '<p class="muted" style="margin:0 0 .5rem">현행 관리규약의 요율표와 수선비 총액(계획금액)을 넣고, 바꿀 기간을 정하면 부족 없이 가는 단가·요율을 계산합니다. 단가 칸을 비우면 부족 없는 최소 균등 단가로 채웁니다. 평준화·조정을 먼저 하고 계산하는 것이 좋습니다.</p>'+
+    '<div class="grid3">'+F('현행 수선비 총액 (원)','ltm.t0',L.t0,{ph:'적립계획서의 장기수선계획 금액'})+'</div>'+
+    '<h3 style="font-size:.95rem;margin:.6rem 0 .3rem">현행 요율표</h3><div style="overflow-x:auto"><table class="kt"><thead><tr><th>시작(년-월)</th><th>끝(년-월)</th><th>요율(%)</th><th></th></tr></thead><tbody>'+L.rr.map(function(r,i){return row(L.rr,'rr',i,'5.11');}).join('')+'</tbody></table></div><button type="button" class="btn ghost sm" data-act="ltradd" data-p="rr">줄 추가</button>'+
+    '<h3 style="font-size:.95rem;margin:.6rem 0 .3rem">개정할 기간과 단가</h3><div style="overflow-x:auto"><table class="kt"><thead><tr><th>시작(년-월)</th><th>끝(년-월)</th><th>㎡당 월 단가(원, 비우면 자동)</th><th></th></tr></thead><tbody>'+L.np.map(function(r,i){return row(L.np,'np',i,'자동');}).join('')+'</tbody></table></div><button type="button" class="btn ghost sm" data-act="ltradd" data-p="np">줄 추가</button>'+
+    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn" data-act="ltrate">계산하기</button><button type="button" class="btn ghost" data-act="ltdocx" data-kind="rate">요율 개정 대비표 Word</button></div><div id="lt-rateout" style="margin-top:.6rem"></div></section>';
+}
+function ltRateCalc(){var L=LQ();return LT.rateSolve(L.items,L.base,L.meta,{total0:L.t0,rows:L.rr,periods:L.np,min:L.lv.min});}
+function ltRateRun(){var box=$('#lt-rateout');if(!box)return;var R=ltRateCalc();
+  if(!R){box.innerHTML='<p class="note">총공급면적, 현행 수선비 총액, 개정할 기간을 넣으세요.</p>';return;}
+  box.innerHTML='<div class="rk-stats">'+ltStat('수선비 총액',LT.eok(R.T1),'','현행 '+LT.eok(R.T0)+(R.T1!==R.T0?' → 조정 반영':''))+ltStat('부족 없는 균등 단가',R.flat?LT.won(R.flat)+'원':'직접 입력','','㎡당 월')+ltStat('요율 누계',R.sumR+'%',R.over?'warn':'',R.over?'100% 초과: 총액 재산정 필요':'')+ltStat('개정 후 잔액',R.ok?'부족 없음':'모자람',R.ok?'':'bad',LT.eok(R.sim.minB)+' ('+R.sim.minY+')')+'</div>'+
+    '<div style="overflow-x:auto;margin-top:.5rem"><table class="kt nw"><thead><tr><th>기간</th><th style="text-align:right">㎡당 월 단가</th><th style="text-align:right">요율</th><th style="text-align:right">누계</th></tr></thead><tbody>'+
+    R.fixed.map(function(r){return '<tr class="muted"><td>'+esc(r.from)+' ~ '+esc(r.to)+(r.part?' (현행 요율 중 개정 전 기간)':' (현행 유지)')+'</td><td style="text-align:right">'+ltU(r.u)+'</td><td style="text-align:right">'+r.r+'%</td><td></td></tr>';}).join('')+
+    R.out.map(function(o){return '<tr><td>'+esc(o.from)+' ~ '+esc(o.to)+'</td><td style="text-align:right"><b>'+ltU(o.u)+'</b>'+(o.auto?' <span class="muted">자동</span>':'')+'</td><td style="text-align:right"><b>'+o.r+'%</b></td><td style="text-align:right">'+o.cum+'%</td></tr>';}).join('')+'</tbody></table></div>'+
+    (R.flat&&R.flat>LT.LH.all*1.8?'<p class="note" style="border-color:var(--warn)">단가가 LH 적정 기준(㎡당 '+LT.LH.all+'원)보다 훨씬 높게 나옵니다. 공사가 한 해에 몰린 계획 그대로라 그렇습니다. 몰림 감지·평준화·조정으로 연도를 먼저 정리한 뒤 다시 계산하세요.</p>':'')+
+    (R.adj?'<p class="muted">누계를 100%로 맞추려고 마지막 기간을 '+ltU(R.adj.u0)+'원에서 올렸습니다.</p>':'')+
+    (R.over?'<p class="note">요율 누계가 100%를 넘습니다. 지난 기간에 덜 적립했거나 수선비 총액이 바뀐 것이므로, 조정된 계획의 수선비 총액으로 요율표 전체를 다시 산정해야 합니다.</p>':'')+
+    '<p class="muted" style="margin-top:.4rem">요율 = 그 기간 적립액 ÷ 수선비 총액 (영 제31조제1항). 요율은 관리규약 사항이므로 관리규약 개정 절차(입대의 제안·의결, 입주자등 과반수 찬성, 신고)를 거칩니다.</p>';}
+function ltFieldDoc(){
+  var L=LQ(),apt=state.complex.name,F=ltFldList(),b=[],yrs=L.fld.yrs||'3';
+  b.push(P(apt+' 장기수선 시설 현장 점검표',{al:'center',b:1,sz:30,sp:[0,60,0]}));
+  b.push(P('대상: '+(yrs==='all'?'전체 시설':yrs+'년 안에 수선 예정인 시설')+' · 점검일:        년    월    일 · 점검자:              (서명)',{al:'center',sz:18,co:'555555',sp:[0,140,0]}));
+  var t=[{c:['No','공사종별','구분·위치·규격','수량','다음 예정','금액(원)','상태','의견(교체 필요·연장 가능 등)','사진'].map(ltH),hd:1}];
+  F.forEach(function(f,i){var o=L.fst[f.k]||{},row=L.items.filter(function(x){return LT.fkey(x)===f.k;})[0]||{};
+    var box=['양호','보통','불량'].map(function(s){return (o.st===s?'■':'□')+s;}).join(' ');
+    t.push({c:[ltC(i+1,null,{sz:16}),ltC(f.n,'l',{sz:16}),ltC([f.g,f.loc,f.spec].filter(Boolean).join(' · '),'l',{sz:15}),ltC((row.q||'')+(row.u||''),null,{sz:15}),ltC(f.nx?f.nx.y+' '+f.nx.m:'',null,{sz:15}),ltC(f.nx?LT.won(f.nx.a):'','r',{sz:15}),ltC(box,null,{sz:15}),ltC(o.memo||'','l',{sz:14}),ltC('',null,{sz:15})],h:[560]});});
+  b.push({k:'t',w:[500,1900,2900,900,1100,1400,1900,3300,700],c:1,rows:t,split:1});
+  b.push(P('※ 상태 기준: 양호 = 정상 작동·외관 이상 없음(연장 검토 가능), 보통 = 경미한 손상(예정대로), 불량 = 기능 저하·누수·부식(앞당김 검토). 사진은 번호를 적고 따로 보관합니다.',{sz:16,co:'555555',sp:[120,0,0]}));
+  return {blocks:b,opt:{landscape:1,margins:[900,900,900,900],footer:1},name:'장기수선_현장점검표'};
+}
+function ltRateDoc(){
+  var L=LQ(),M=L.meta,apt=state.complex.name,R=ltRateCalc(),b=[];
+  b.push(P(apt+' 관리규약 개정안 대비표 (장기수선충당금 적립요율)',{al:'center',b:1,sz:28,sp:[0,160,0]}));
+  if(!R){b.push(P('총공급면적, 현행 수선비 총액, 개정할 기간을 넣으면 대비표가 만들어집니다.',{sz:20}));return {blocks:b,opt:{},name:'적립요율_개정_대비표'};}
+  var cur=R.cur.map(function(r){return r.from.replace('-','. ')+'. ~ '+r.to.replace('-','. ')+'. : '+r.r+'%';}).join('\n');
+  var nw=R.fixed.map(function(r){return r.from.replace('-','. ')+'. ~ '+r.to.replace('-','. ')+'. : '+r.r+'%';}).concat(R.out.map(function(o){return o.from.replace('-','. ')+'. ~ '+o.to.replace('-','. ')+'. : '+o.r+'%';})).join('\n');
+  b.push({k:'t',w:[3600,3600,1872],c:1,rows:[{c:['현  행','개 정 안','비  고'].map(ltH),hd:1},{c:[ltC('장기수선충당금 적립요율\n'+cur,'l',{sz:18}),ltC('장기수선충당금 적립요율\n'+nw,'l',{sz:18,b:1}),ltC('장기수선계획 조정에 따른 재원 확보\n(수선비 총액 '+LT.eok(R.T0)+(R.T1!==R.T0?' → '+LT.eok(R.T1):'')+')','l',{sz:16})]}]});
+  b.push(P('개정 요율에 따른 적립 단가',{b:1,sz:21,sp:[240,80,0]}));
+  var t=[{c:['기간','요율(%)','누계(%)','㎡당 월 단가(원)','연간 적립액(원)'].map(ltH),hd:1}];
+  R.out.forEach(function(o){t.push({c:[ltC(o.from+' ~ '+o.to),ltC(o.r),ltC(o.cum),ltC(ltU(o.u),'r'),ltC(LT.won(ltNum(M.area)*o.u*12),'r')]});});
+  b.push({k:'t',w:[2400,1300,1300,2000,2072],c:1,rows:t});
+  var T=M.types.filter(function(x){return ltNum(x.a)&&ltNum(x.n);});
+  if(T.length){b.push(P('세대 유형별 월 부담액',{b:1,sz:21,sp:[200,80,0]}));
+    var t2=[{c:['공급면적','세대수'].concat(R.out.map(function(o){return o.from.slice(0,4)+'~'+o.to.slice(0,4);})).map(ltH),hd:1}];
+    T.forEach(function(x){t2.push({c:[ltC(x.a+'㎡'),ltC(x.n)].concat(R.out.map(function(o){return ltC(LT.won(ltNum(x.a)*o.u)+'원','r');}))});});
+    var w=[1500,1100],rest=Math.floor((9072-2600)/R.out.length);R.out.forEach(function(){w.push(rest);});b.push({k:'t',w:w,c:1,rows:t2});}
+  b.push(P('※ 요율 = 해당 기간 적립액 ÷ 장기수선계획 기간 중 수선비 총액 (공동주택관리법 시행령 제31조제1항). 월간 세대별 충당금 = 수선비 총액 × 요율 ÷ (총공급면적 × 12 × 해당 요율의 계획기간) × 세대 공급면적.',{sz:16,co:'555555',sp:[160,0,0]}));
+  b.push(P('※ 이 계산은 장기수선계획 조정안의 연도별 공사비와 '+String(M.balDate).replace('-','. ')+'. 기준 잔액 '+LT.eok(M.bal)+'을 바탕으로 한 것입니다.',{sz:16,co:'555555'}));
+  return {blocks:b,opt:{},name:'적립요율_개정_대비표'};
+}
+function ltAct3(act,a){
+  var L=LQ(),i=+a.dataset.i;
+  if(act==='lthload'){var f=$('#lthfile');if(f)f.click();return true;}
+  if(act==='lthclear'){L.kh=[];saveNow();ltKh();return true;}
+  if(act==='lthapply'){ltHistApply();return true;}
+  if(act==='ltradd'){var p=a.dataset.p,arr=L[p],last=arr[arr.length-1];arr.push(p==='rr'?{from:'',to:'',r:''}:{from:last&&last.to?(function(){var m=last.to.match(/(\d{4})\D*(\d{1,2})/);if(!m)return '';var y=+m[1],mo=+m[2]+1;if(mo>12){y++;mo=1;}return y+'-'+String(mo).padStart(2,'0');})():'',to:'',u:''});saveNow();ltPaint();return true;}
+  if(act==='ltrdel'){L[a.dataset.p].splice(i,1);saveNow();ltPaint();return true;}
+  if(act==='ltrate'){ltRateRun();return true;}
+  return false;
+}
+
 /* ── 문서 ── */
 function ltH(t){return {t:t,b:1,f:'E7E6E6',al:'c',sz:18};}
 function ltC(t,al,o){var c={t:t==null?'':String(t),al:al||'c',sz:18};if(o)for(var k in o)c[k]=o[k];return c;}
@@ -4420,6 +4653,8 @@ function ltDoc(kind){
     return {blocks:b,opt:{border:1},name:'장기수선충당금_적립사용_공개'};
   }
   if(kind==='review')return ltReviewDoc();
+  if(kind==='field')return ltFieldDoc();
+  if(kind==='rate')return ltRateDoc();
   if(kind==='full')return ltFullDoc();
   return ltDoc('adj');
 }
@@ -4433,6 +4668,7 @@ function ltInput(b,el){
   if(/^ltm\.(prices|pesc|wiz)/.test(b))return;
   if(/^ltm\.est\./.test(b)){ltEstPaint();return;}
   if(/^ltm\.lv\./.test(b))return;
+  if(/^ltm\.(rr|np|t0|fld|guide)/.test(b))return;
   if(v==='sim'){ltSimOut();return;}
   if(v==='adj'){if(b==='ltm.adj.kind'){ltPaint();return;}ltAgree();clearTimeout(ltInput._t);ltInput._t=setTimeout(ltDocPaint,200);return;}
   if(v==='use'){if(b==='ltm.use.y'){ltPaint();return;}clearTimeout(ltInput._t);ltInput._t=setTimeout(ltUsePaint,200);return;}
@@ -4443,6 +4679,8 @@ function ltInputEl(el){
   if(el.dataset.ltna!==undefined){if(el.checked)L.na[el.dataset.ltna]=1;else delete L.na[el.dataset.ltna];save();var y=window.scrollY;ltPaint();window.scrollTo(0,y);return true;}
   if(el.dataset.ltfon!==undefined){var f0=L.facs[+el.dataset.ltfon];if(f0){f0.on=el.checked;save();var fn2=$('#lt-facn');if(fn2)fn2.textContent='사용 '+L.facs.filter(function(f){return f.on;}).length+'개 / 전체 '+L.facs.length+'개';var tr=el.closest('tr');if(tr)tr.style.opacity=el.checked?'':'.55';}return true;}
   if(el.dataset.ltf!==undefined){var k=el.dataset.ltf,fd=el.dataset.fld;L.fst[k]=L.fst[k]||{};L.fst[k][fd]=el.type==='checkbox'?el.checked:el.value;save();return true;}
+  if(el.dataset.ltg!==undefined){L.guide[el.dataset.ltg]=el.checked;save();var y0=window.scrollY;ltPaint();window.scrollTo(0,y0);return true;}
+  if(el.dataset.ltkh!==undefined){var h=L.kh[+el.dataset.ltkh];if(h){h[el.dataset.fld]=el.value;save();}return true;}
   if(el.dataset.ltuse!==undefined){var id=el.dataset.ltuse,a=L.use.ids.filter(function(x){return x!==id;});if(el.checked)a.push(id);L.use.ids=a;save();ltUsePaint();return true;}
   return false;
 }
@@ -4463,6 +4701,7 @@ function ltImport(e){
 function ltMsg(h){var m=$('#ltmsg');if(m)m.innerHTML=h;toast(h.replace(/<[^>]+>/g,'').replace('되돌리기',''));}
 function ltAct(act,a){
   if(ltAct2(act,a))return true;
+  if(ltAct3(act,a))return true;
   var L=LQ(),i=+a.dataset.i;
   if(act==='ltload'){var f=$('#ltfile');if(f)f.click();return true;}
   if(act==='ltundo'){if(ltUndo){state.ltm=merge(ltmDefault(),JSON.parse(ltUndo));ltUndo=null;saveNow();go('longterm',true);toast('불러오기 전으로 되돌렸습니다.');}return true;}
@@ -4508,7 +4747,7 @@ function onInput(e){
   var el=e.target;
   if(el.closest&&el.closest('#spdoc')){var ce=el.closest('[data-k]');if(ce)spInput(ce);return;}
   if(el.dataset&&el.dataset.rk!==undefined){rlKeyInput(el);return;}
-  if(el.dataset&&(el.dataset.ltna!==undefined||el.dataset.ltuse!==undefined||el.dataset.ltfon!==undefined||el.dataset.ltf!==undefined)){ltInputEl(el);return;}
+  if(el.dataset&&(el.dataset.ltna!==undefined||el.dataset.ltuse!==undefined||el.dataset.ltfon!==undefined||el.dataset.ltf!==undefined||el.dataset.ltg!==undefined||el.dataset.ltkh!==undefined)){ltInputEl(el);return;}
   if(el.dataset&&el.dataset.sui!==undefined){var bq=BQ(),n=+el.dataset.sui,arr=(bq.sui||[]).map(Number).filter(function(x){return x!==n;});if(el.checked)arr.push(n);bq.sui=arr.sort(function(x,y){return x-y;});save();refreshBid();return;}
   var b=el.getAttribute&&el.getAttribute('data-bind');if(!b)return;
   setPath(state,b,el.type==='checkbox'?el.checked:el.value);save();
@@ -4537,6 +4776,7 @@ function onClick(e){
   var de=e.target.closest('#eltabs button[data-edoc]');if(de){EQ().ui.doc=de.dataset.edoc;save();refreshElect(true);return;}
   var db=e.target.closest('#bdtabs button[data-bdoc]');if(db){BQ().ui.doc=db.dataset.bdoc;save();refreshBid(true);return;}
   var lv=e.target.closest('#lttabs button[data-ltv]');if(lv){LQ().ui.v=lv.dataset.ltv;save();ltPaint();return;}
+  var lv2=e.target.closest('[data-ltv2]');if(lv2){LQ().ui.v=lv2.dataset.ltv2;save();ltPaint();var tb=$('#lttabs');if(tb)tb.scrollIntoView({behavior:'smooth',block:'start'});return;}
   var ld=e.target.closest('#ltdtabs button[data-ltd]');if(ld){LQ().ui.doc=ld.dataset.ltd;save();ltDocPaint();return;}
   var dr=e.target.closest('#rltabs button[data-rdoc]');if(dr){R().ui.doc=dr.dataset.rdoc;save();refreshRules();return;}
   var dt=e.target.closest('#pvtabs button[data-doc]');if(dt){state.ui.doc=dt.dataset.doc;save();refreshPreview();return;}
