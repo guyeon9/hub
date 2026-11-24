@@ -1374,7 +1374,7 @@ var LT=(function(){
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.13.0';
+var APP_VER='1.13.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -4443,10 +4443,11 @@ function ltKh(){var L=LQ(),box=$('#lt-kh');if(!box)return;if(!L.kh.length){box.i
         '<td><select data-ltkh="'+i+'" data-fld="k" style="max-width:15rem"'+(h.done?' disabled':'')+'>'+opt(h.k)+'</select></td><td>'+(h.done?'<span class="tag on">반영함</span>':'<select data-ltkh="'+i+'" data-fld="act">'+[['past','주기 반영'],['note','기록만'],['skip','빼기']].map(function(o){return '<option value="'+o[0]+'"'+(h.act===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>')+'</td></tr>';}).join('')+'</tbody></table></div>'+
     (todo?'<div class="row" style="margin-top:.6rem"><button type="button" class="btn" data-act="lthapply">선택대로 반영</button><span class="muted">반영 전으로 되돌리기도 됩니다.</span></div>':'');}
 function ltHistImport(e){var f=e.target.files&&e.target.files[0];if(!f)return;e.target.value='';
-  ltReadFile(f,function(rows,t){var r=LT.histFromRows(rows||LT.parseCSV(t));if(r.err){toast(r.err);return;}var L=LQ(),F=LT.facilities(L.items);
+  ltReadFile(f,function(rows,t){var r=LT.histFromRows(rows||LT.parseCSV(t));if(r.err){toast(r.err);return;}ltHistRows(r);});}
+function ltHistRows(r){var L=LQ();{
     r.list.forEach(function(h){var m=LT.matchHist(h,L.items);h.k=m?m.k:'';var fa=m?L.items.filter(function(x){return LT.fkey(x)===m.k&&x.m!=='부분';}).reduce(function(s,x){return Math.max(s,ltNum(x.a));},0):0;
       h.act=!m?'skip':(/장기수선/.test(h.cost)&&/전면|전체/.test(h.m)&&h.a>=5000000&&(!fa||h.a>=fa*0.6)?'past':'note');});
-    L.kh=r.list.sort(function(a,b){return String(b.d).localeCompare(String(a.d));});saveNow();ltKh();toast('이력 '+r.list.length+'건을 불러와 '+r.list.filter(function(h){return h.k;}).length+'건을 계획의 시설과 짝지었습니다.');});}
+    L.kh=r.list.sort(function(a,b){return String(b.d).localeCompare(String(a.d));});saveNow();ltKh();toast('유지관리이력 '+r.list.length+'건을 불러와 '+r.list.filter(function(h){return h.k;}).length+'건을 계획의 시설과 짝지었습니다. 아래 표에서 확인 후 "선택대로 반영"을 누르세요.');}}
 function ltHistApply(){
   var L=LQ(),n=0,msgs=[];ltUndo=JSON.stringify(L);
   var latest={};L.kh.forEach(function(h){if(!h.done&&h.act==='past'&&h.k&&(!latest[h.k]||h.y>latest[h.k].y))latest[h.k]=h;});
@@ -4691,7 +4692,8 @@ function ltImport(e){
     try{
       if(t!=null&&/^\s*[{[]/.test(t)){var o=JSON.parse(t),src=o&&o.ltm?o.ltm:o;if(!src||!Array.isArray(src.items))throw 0;state.ltm=merge(ltmDefault(),src);if(!state.ltm.base.length){state.ltm.base=JSON.parse(JSON.stringify(state.ltm.items));state.ltm.baseAt=ltToday();}
         saveNow();go('longterm',true);ltMsg('단지 자료를 불러왔습니다: 항목 '+state.ltm.items.length+'건. <button type="button" class="btn ghost sm" data-act="ltundo">되돌리기</button>');return;}
-      var r=rows?LT.itemsFromRows(rows):LT.itemsFromCSV(t);if(r.err){toast(r.err);return;}
+      var r=rows?LT.itemsFromRows(rows):LT.itemsFromCSV(t);
+      if(r.err){var hr=LT.histFromRows(rows||LT.parseCSV(t));if(!hr.err&&L.items.length){ltUndo=null;L.ui.v='field';saveNow();ltPaint();ltHistRows(hr);return;}toast(r.err+(hr.err?'':' (유지관리이력 파일은 계획 항목을 먼저 불러온 뒤 넣으세요.)'));return;}
       L.items=r.items;L.base=JSON.parse(JSON.stringify(r.items));L.baseAt=ltToday();L.why={};L.use.ids=[];L.ui.fy='';
       var ys=ltYears();if(!L.meta.end&&ys.length)L.meta.end=String(ys[ys.length-1]);
       saveNow();ltPaint();ltMsg((rows?'엑셀':'CSV')+'에서 '+r.items.length+'건을 불러와 현행 계획 기준으로 잡았습니다. <button type="button" class="btn ghost sm" data-act="ltundo">되돌리기</button>');
