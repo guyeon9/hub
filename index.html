@@ -126,6 +126,9 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .pv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.3rem .8rem;font-size:.85rem;cursor:pointer;color:var(--ink2)}
 .pv-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
 .lt-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:1.1rem 0 .55rem;padding:0;list-style:none}
+#sys-svg.sys-fit svg{width:100%!important;height:auto!important}
+#sys-svg [data-sysn]:focus{outline:none}
+#sys-svg [data-sysn]:focus-visible rect:first-child{stroke:var(--accent);stroke-width:3}
 .lt-steps button{width:100%;display:flex;align-items:center;gap:.45rem;border:1px solid var(--line);background:var(--surface);border-radius:.6rem;padding:.45rem .55rem;cursor:pointer;color:var(--ink2);font-size:.85rem;text-align:left;line-height:1.25}
 .lt-steps button b{flex:none;display:inline-grid;place-items:center;width:1.55rem;height:1.55rem;border-radius:50%;background:var(--surface2);color:var(--ink2);font-size:.8rem}
 .lt-steps button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
@@ -1544,13 +1547,138 @@ var CAL = (function () {
 })();
 
 
+/* 설비 계통도 — 계통 자료(JSON)를 정리하고 흐름도를 그린다.
+   자료 모양: {kind:'guyeon-sys', v:1, name, src, sys:[{id, t, story, nodes:[{id,t,k,spec,qty,loc,sheet,note,check,ltm}], links:[{a,b,t}]}]} */
+var SYS = (function () {
+  var KIND = {
+    src: ['인입·수원', '#2b7bb9'], tank: ['수조·탱크', '#1f8a70'], pump: ['펌프', '#c2410c'], valve: ['밸브·장치', '#7c3aed'],
+    pipe: ['배관·구간', '#64748b'], use: ['세대·사용처', '#4d7c0f'], panel: ['수신기·반', '#b91c1c'], tr: ['변압기·수전', '#a16207'],
+    gen: ['발전기·축전지', '#db2777'], dev: ['기타 설비', '#475569']
+  };
+  var SYSNAME = { water: '급수', fire: '소화', alarm: '소방 경보', elec: '전기', drain: '배수', gas: '가스', heat: '난방·급탕' };
+  function s(v) { return v == null ? '' : String(v); }
+  function norm(o) {
+    if (!o || typeof o !== 'object') throw new Error('형식');
+    var out = { kind: 'guyeon-sys', v: 1, name: s(o.name), src: s(o.src), note: s(o.note), sys: [] };
+    (Array.isArray(o.sys) ? o.sys : []).forEach(function (x, i) {
+      var id = s(x.id) || ('s' + i), nodes = [], seen = {};
+      (Array.isArray(x.nodes) ? x.nodes : []).forEach(function (n, j) {
+        var nid = s(n.id) || ('n' + j); while (seen[nid]) nid += '_'; seen[nid] = 1;
+        nodes.push({ id: nid, t: s(n.t) || nid, k: KIND[n.k] ? n.k : 'dev', spec: s(n.spec), qty: s(n.qty), loc: s(n.loc), sheet: s(n.sheet), note: s(n.note), check: s(n.check), ltm: s(n.ltm) });
+      });
+      var links = (Array.isArray(x.links) ? x.links : []).map(function (l) { return { a: s(l.a), b: s(l.b), t: s(l.t) }; }).filter(function (l) { return seen[l.a] && seen[l.b] && l.a !== l.b; });
+      out.sys.push({ id: id, t: s(x.t) || SYSNAME[id] || id, story: s(x.story), nodes: nodes, links: links });
+    });
+    if (!out.sys.length) throw new Error('계통이 없습니다');
+    return out;
+  }
+  /* 왼쪽→오른쪽 흐름 배치: 들어오는 선이 없는 것부터 단계를 매긴다(순환이 있어도 멈추게) */
+  function layout(sy) {
+    var N = sy.nodes, L = {}, inc = {}, out = {};
+    N.forEach(function (n) { L[n.id] = 0; inc[n.id] = 0; out[n.id] = []; });
+    sy.links.forEach(function (l) { inc[l.b]++; out[l.a].push(l.b); });
+    for (var it = 0; it < N.length + 1; it++) {
+      var ch = false;
+      sy.links.forEach(function (l) { if (L[l.b] < L[l.a] + 1 && L[l.a] + 1 <= N.length) { L[l.b] = L[l.a] + 1; ch = true; } });
+      if (!ch) break;
+    }
+    /* 들어오는 선이 없는 상자는 이어지는 상자 바로 앞 칸으로 당긴다(선이 다른 상자를 가로지르지 않게) */
+    for (var it2 = 0; it2 < N.length; it2++) {
+      var ch2 = false;
+      N.forEach(function (n) { if (inc[n.id] || !out[n.id].length) return; var m = Math.min.apply(null, out[n.id].map(function (b) { return L[b]; })) - 1; if (m > L[n.id]) { L[n.id] = m; ch2 = true; } });
+      if (!ch2) break;
+    }
+    var cols = {};
+    N.forEach(function (n) { (cols[L[n.id]] = cols[L[n.id]] || []).push(n); });
+    var ks = Object.keys(cols).map(Number).sort(function (a, b) { return a - b; });
+    /* 선이 덜 엇갈리게: 이웃 칸에서 이어진 상자들의 평균 순서로 정렬(오른쪽·왼쪽 번갈아 몇 번) */
+    var idx = {}, pre = {};
+    N.forEach(function (n) { pre[n.id] = []; });
+    sy.links.forEach(function (l) { pre[l.b].push(l.a); });
+    function setIdx(c) { cols[c].forEach(function (n, i) { idx[n.id] = i; }); }
+    ks.forEach(setIdx);
+    function bary(list, key) { var v = list.filter(function (id) { return idx[id] != null; }).map(function (id) { return idx[id]; }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : key; }
+    for (var sw = 0; sw < 4; sw++) {
+      ks.forEach(function (c, ci) { if (ci === 0) return; cols[c] = cols[c].map(function (n, i) { return { n: n, v: bary(pre[n.id], i) }; }).sort(function (a, b) { return a.v - b.v; }).map(function (o) { return o.n; }); setIdx(c); });
+      ks.slice().reverse().forEach(function (c, ci) { if (ci === 0) return; cols[c] = cols[c].map(function (n, i) { return { n: n, v: bary(out[n.id], i) }; }).sort(function (a, b) { return a.v - b.v; }).map(function (o) { return o.n; }); setIdx(c); });
+    }
+    var W = 184, H = 88, GX = 76, GY = 20, pos = {}, maxR = 0;
+    ks.forEach(function (c) { maxR = Math.max(maxR, cols[c].length); });
+    ks.forEach(function (c, ci) { var off = (maxR - cols[c].length) * (H + GY) / 2; cols[c].forEach(function (n, ri) { pos[n.id] = { x: 16 + ci * (W + GX), y: 16 + off + ri * (H + GY) }; }); });
+    return { pos: pos, W: W, H: H, w: 32 + ks.length * W + (ks.length - 1) * GX, h: 32 + maxR * H + (maxR - 1) * GY };
+  }
+  function esc(t) { return s(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function cut(t, n) { t = s(t); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+  /* 제목을 두 줄까지: 띄어쓰기에서 먼저 끊고, 넘치면 자른다 */
+  function wrap(t, n) {
+    t = s(t); if (t.length <= n) return [t];
+    var cut1 = t.lastIndexOf(' ', n); if (cut1 < 4) cut1 = n;
+    var a = t.slice(0, cut1).trim(), b = t.slice(cut1).trim();
+    return [a, cut(b, n + 1)];
+  }
+  function svg(sy, sel, hits) {
+    var g = layout(sy), P = g.pos, W = g.W, H = g.H, h = '', lab = '';
+    h += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + g.w + ' ' + g.h + '" width="' + g.w + '" height="' + g.h + '" role="img" aria-label="' + esc(sy.t) + ' 계통도" style="max-width:none;font-family:inherit">';
+    h += '<defs><marker id="sysar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted,#888)"/></marker></defs>';
+    var seenL = {};
+    sy.links.forEach(function (l) {
+      var a = P[l.a], b = P[l.b]; if (!a || !b) return;
+      var x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2, mx = (x1 + x2) / 2;
+      if (x2 <= x1) { x1 = a.x + W / 2; y1 = a.y + H; x2 = b.x + W / 2; y2 = b.y; mx = x1; }
+      h += '<path d="M' + x1 + ' ' + y1 + ' C' + mx + ' ' + y1 + ' ' + mx + ' ' + y2 + ' ' + (x2 - 2) + ' ' + y2 + '" fill="none" stroke="var(--muted,#888)" stroke-width="2" marker-end="url(#sysar)"/>';
+      var lk = l.a + '|' + l.t, t = .5, u = 1 - t, lx = u * u * u * x1 + 3 * u * u * t * mx + 3 * u * t * t * mx + t * t * t * x2, ly = u * u * u * y1 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y2;
+      if (l.t && !seenL[lk]) { seenL[lk] = 1; lab += '<text x="' + lx.toFixed(1) + '" y="' + (ly - 6).toFixed(1) + '" text-anchor="middle" font-size="10.5" fill="var(--ink2,#555)" paint-order="stroke" stroke="var(--surface2,#f6f8f7)" stroke-width="5" stroke-linejoin="round">' + esc(cut(l.t, 14)) + '</text>'; }
+    });
+    sy.nodes.forEach(function (n) {
+      var p = P[n.id], k = KIND[n.k] || KIND.dev, on = sel === n.id, hit = hits && hits[n.id], tl = wrap(n.t, 11);
+      h += '<g data-sysn="' + esc(n.id) + '" tabindex="0" role="button" aria-label="' + esc(n.t) + '" style="cursor:pointer">' +
+        '<rect x="' + p.x + '" y="' + p.y + '" width="' + W + '" height="' + H + '" rx="10" fill="var(--surface,#fff)" stroke="' + (on ? k[1] : 'var(--line,#ccc)') + '" stroke-width="' + (on ? 3 : 1.5) + '"/>' +
+        '<rect x="' + p.x + '" y="' + p.y + '" width="6" height="' + H + '" rx="3" fill="' + k[1] + '"/>' +
+        '<text x="' + (p.x + 16) + '" y="' + (p.y + 22) + '" font-size="11" fill="' + k[1] + '" font-weight="700">' + esc(k[0]) + (n.qty ? ' · ' + esc(cut(n.qty, 10)) : '') + '</text>' +
+        tl.map(function (ln, i) { return '<text x="' + (p.x + 16) + '" y="' + (p.y + 41 + i * 18) + '" font-size="14" font-weight="700" fill="var(--ink,#111)">' + esc(ln) + '</text>'; }).join('') +
+        '<text x="' + (p.x + 16) + '" y="' + (p.y + (tl.length > 1 ? 78 : 62)) + '" font-size="11" fill="var(--ink2,#555)">' + esc(cut(n.spec || n.loc, 22)) + '</text>' +
+        (hit ? '<circle cx="' + (p.x + W - 14) + '" cy="' + (p.y + 14) + '" r="9" fill="#c2410c"/><text x="' + (p.x + W - 14) + '" y="' + (p.y + 18) + '" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">' + (hit > 9 ? '9+' : hit) + '</text>' : '') +
+        '</g>';
+    });
+    return h + lab + '</svg>';
+  }
+  /* 다른 AI에게 도면을 읽혀 이 형식으로 받는 부탁 글 */
+  function prompt(apt) {
+    return [
+      '첨부한 공동주택 준공도면을 읽고, 아래 JSON 형식 하나로만 답해 주세요. 설명 문장은 JSON 밖에 쓰지 마세요.',
+      '',
+      '[읽을 도면] 장비일람표(기계·소화), 펌프실·물탱크실 평면도, 동별 급수·소화배관 계통도, 소방설비 계통도(수신기), 변전설비 단선결선도. 평면도만 있으면 읽을 수 있는 만큼만 적으세요.',
+      '',
+      '[규칙]',
+      '1. 도면에 보이는 것만 적습니다. 추측한 값은 넣지 말고, 애매하면 note에 "확인 필요"라고 씁니다.',
+      '2. 각 설비에 어느 도면에서 읽었는지 sheet(예: "M-03 장비일람표")를 적습니다.',
+      '3. 흐름 방향대로 links를 잇습니다(물이 흐르는 방향, 전기가 가는 방향, 신호가 가는 방향).',
+      '4. k(종류)는 다음 중 하나: src(인입·수원) tank(수조·탱크) pump(펌프) valve(밸브·장치) pipe(배관·구간) use(세대·사용처) panel(수신기·반) tr(변압기·수전) gen(발전기·축전지) dev(기타)',
+      '5. 계통(sys.id)은 water(급수) fire(소화) alarm(소방 경보) elec(전기)를 기본으로, 있으면 drain(배수) gas(가스) heat(난방·급탕)도 넣습니다.',
+      '6. story에는 관리사무소장이 이해하기 쉽게 그 계통의 흐름을 2~4문장으로 씁니다(예: "수돗물이 지하 저수조에 모였다가 펌프로 옥상 물탱크에 올라가고…").',
+      '7. check에는 그 설비에서 평소 점검할 것을 한 줄로 씁니다.',
+      '8. ltm에는 장기수선계획에서 찾을 낱말을 씁니다(예: "급수펌프", "고가수조", "변압기").',
+      '',
+      '[형식]',
+      '{"kind":"guyeon-sys","v":1,"name":"' + (apt || '○○아파트') + '","src":"준공도면(작성 연월)","sys":[',
+      ' {"id":"water","t":"급수","story":"…","nodes":[',
+      '   {"id":"w1","t":"상수도 인입","k":"src","spec":"100mm","qty":"","loc":"옥외","sheet":"M-06","note":"","check":"","ltm":""},',
+      '   {"id":"w2","t":"지하 저수조","k":"tank","spec":"","qty":"2칸","loc":"펌프실","sheet":"M-06","note":"","check":"반기 청소, 월 위생점검","ltm":"저수조"}',
+      ' ],"links":[{"a":"w1","b":"w2","t":"정수위밸브"}]}',
+      ']}'
+    ].join('\n');
+  }
+  return { KIND: KIND, SYSNAME: SYSNAME, norm: norm, layout: layout, svg: svg, prompt: prompt };
+})();
+
+
 (function(){
 'use strict';
 
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.16.2';
+var APP_VER='1.17.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -1562,6 +1690,7 @@ function defaultState(){
     agendas:[],
     risk:{url:'',key:''},
     cal:calDefault(),
+    sys:sysDefault(),
     kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:''},
     safety:{ver:SP_VER,edits:{}},
     rules:rulesDefault(),
@@ -2282,6 +2411,7 @@ var TABS=[
   {id:'risk',t:'위험성평가',s:'연결'},
   {id:'rules',t:'관리규약'},
   {id:'longterm',t:'장기수선'},
+  {id:'sys',t:'설비 계통도'},
   {id:'bid',t:'입찰·계약'},
   {id:'elect',t:'선거'}
 ];
@@ -2317,7 +2447,7 @@ function go(id,noHash){
   tab=id;
   $$('#tabs button').forEach(function(b){if(b.dataset.tab===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   var v=$('#view');
-  ({home:renderHome,cal:renderCal,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm}[id]||renderSoon)(v,id);
+  ({home:renderHome,cal:renderCal,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm,sys:renderSys}[id]||renderSoon)(v,id);
   if(!noHash){try{history.replaceState(null,'','#'+id);}catch(e){}}
   window.scrollTo(0,0);
 }
@@ -4717,6 +4847,113 @@ function calAct(act,a){
 function calRefresh(){if(tab==='cal')calPaint();else if(tab==='home'){var y=window.scrollY;go('home',true);window.scrollTo(0,y);}}
 
 
+/* ═════════ 설비 계통도 ═════════ */
+function sysDefault(){return {data:null,ui:{s:'',sel:'',edit:false}};}
+function SQ(){if(!state.sys||!state.sys.ui)state.sys=merge(sysDefault(),state.sys||{});return state.sys;}
+function sysCur(){var q=SQ(),d=q.data;if(!d)return null;var s=d.sys.filter(function(x){return x.id===q.ui.s;})[0]||d.sys[0];q.ui.s=s.id;return s;}
+function sysKw(n){return String(n.ltm||'').split(/[|,·]/).map(function(w){return w.replace(/\s/g,'');}).filter(function(w){return w.length>=2;});}
+function sysLtm(n){
+  var kw=sysKw(n);if(!kw.length)return [];
+  var L;try{L=LQ().items||[];}catch(e){L=[];}
+  return L.filter(function(x){var t=String((x.n||'')+(x.g||'')+(x.loc||'')).replace(/\s/g,'');return kw.some(function(w){return t.indexOf(w)>=0;});})
+    .sort(function(a,b){return (+a.y)-(+b.y);});
+}
+function renderSys(v){
+  var q=SQ();
+  v.innerHTML='<h1 class="h-title">설비 계통도</h1><p class="lead">우리 단지의 급수·소화·소방 경보·전기가 어디서 시작해 어디로 가는지 그림으로 봅니다. 상자를 누르면 규격·위치·점검할 것과 그 설비의 장기수선계획이 나옵니다.</p><div id="sysv"></div>';
+  sysPaint();
+  var bx=$('#sysv');if(bx)bx.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('[data-sysn]')){e.preventDefault();sysClick(e);}});
+}
+function sysIntro(){
+  return '<section class="card"><h2>계통도 만들기 <small>도면을 AI에게 읽혀 붙여넣는 방식</small></h2>'+
+    '<ol class="rl-steps" style="margin:.2rem 0 .8rem">'+
+      '<li><b>도면 준비</b><p>준공도면 중 장비일람표(기계·소화), 펌프실 평면도, 동별 급수·소화배관 계통도, 소방설비 계통도, 변전설비 단선결선도를 PDF나 사진으로 준비합니다. 캐드(.dwg)는 PDF로 내보내야 읽힙니다.</p></li>'+
+      '<li><b>AI에게 부탁</b><p>아래 "AI 부탁 글 복사"를 눌러, 쓰시는 Claude·ChatGPT 등에 도면과 함께 붙여넣습니다.</p></li>'+
+      '<li><b>답 붙여넣기</b><p>AI가 준 답(JSON)을 아래 칸에 붙여넣고 "넣기"를 누르면 그림이 그려집니다. 틀린 곳은 "고치기"에서 바로 고칩니다.</p></li></ol>'+
+    '<div class="row" style="flex-wrap:wrap"><button type="button" class="btn" data-act="sysprompt">AI 부탁 글 복사</button><button type="button" class="btn ghost" data-act="sysload">저장한 파일 불러오기 (JSON)</button><button type="button" class="btn ghost sm" data-act="sysblank">빈 틀로 직접 만들기</button></div>'+
+    '<input type="file" id="sysfile" accept=".json,application/json,.txt" hidden>'+
+    '<label class="f" style="margin-top:.8rem"><span>AI 답 붙여넣기</span><textarea id="sys-paste" rows="5" placeholder="{&quot;kind&quot;:&quot;guyeon-sys&quot;, ... } 를 여기에"></textarea></label>'+
+    '<div class="row"><button type="button" class="btn" data-act="syspaste">넣기</button><span class="muted" id="sys-msg"></span></div>'+
+    '<p class="muted" style="margin:.8rem 0 0;font-size:.85rem">도면에서 읽은 계통은 <b>준공 당시</b> 기준입니다. 그 뒤에 바꾼 설비(펌프 교체, 수신기 이전 등)는 "고치기"에서 메모로 남기세요. 단지 자료는 이 브라우저에만 저장되니 "파일로 저장"으로 따로 보관하세요.</p></section>';
+}
+function sysPaint(){
+  var q=SQ(),box=$('#sysv');if(!box)return;
+  if(!q.data){box.innerHTML=sysIntro();sysBindFile();return;}
+  var d=q.data,s=sysCur(),sel=s.nodes.filter(function(n){return n.id===q.ui.sel;})[0];
+  var hits={};s.nodes.forEach(function(n){var c=sysLtm(n).length;if(c)hits[n.id]=c;});
+  box.innerHTML='<section class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap"><div><h2 style="margin:0">'+esc(d.name||'우리 단지')+' 설비 계통</h2><p class="muted" style="margin:.2rem 0 0">'+esc(d.src||'')+(d.note?' · '+esc(d.note):'')+'</p></div>'+
+      '<div class="row" style="flex-wrap:wrap"><button type="button" class="btn ghost sm" data-act="sysedit">'+(q.ui.edit?'그림 보기':'고치기')+'</button><button type="button" class="btn ghost sm" data-act="syssave">파일로 저장</button><button type="button" class="btn ghost sm" data-act="syssvg">그림 저장(SVG)</button><button type="button" class="btn ghost sm" data-act="sysprompt">AI 부탁 글 복사</button><button type="button" class="btn ghost sm" data-act="sysclear">다른 자료 넣기</button></div></div>'+
+    '<div class="pv-tabs" id="systabs" role="group" aria-label="계통" style="margin-top:.8rem">'+d.sys.map(function(x){return '<button type="button" data-syss="'+esc(x.id)+'" aria-pressed="'+(x.id===s.id)+'">'+esc(x.t)+' <small class="muted">'+x.nodes.length+'</small></button>';}).join('')+'</div>'+
+    (s.story?'<p style="margin:.2rem 0 .8rem;line-height:1.7">'+esc(s.story)+'</p>':'')+
+    (q.ui.edit?sysEditHtml(s):
+      '<div class="row" style="justify-content:flex-end;margin-bottom:.3rem"><button type="button" class="btn ghost sm" data-act="sysfit" aria-pressed="'+!!q.ui.fit+'">'+(q.ui.fit?'크게 보기':'한눈에 보기')+'</button></div>'+
+      '<div style="overflow:auto;border:1px solid var(--line);border-radius:.6rem;background:var(--surface2);-webkit-overflow-scrolling:touch" id="sys-svg"'+(q.ui.fit?' class="sys-fit"':'')+'>'+SYS.svg(s,q.ui.sel,hits)+'</div>'+
+      '<p class="muted" style="font-size:.82rem;margin:.4rem 0 0">왼쪽에서 오른쪽으로 흐릅니다. 그림이 넓으면 옆으로 밀어 보세요. 상자를 누르면 아래에 자세히 나옵니다. 주황 숫자는 장기수선계획에 잡힌 항목 수입니다.'+'</p>'+
+      '<div class="row" style="flex-wrap:wrap;gap:.3rem;margin-top:.4rem">'+Object.keys(SYS.KIND).filter(function(k){return s.nodes.some(function(n){return n.k===k;});}).map(function(k){return '<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--ink2);margin-right:.6rem"><i style="width:.7rem;height:.7rem;border-radius:2px;background:'+SYS.KIND[k][1]+'"></i>'+SYS.KIND[k][0]+'</span>';}).join('')+'</div>'+
+      '<div id="sys-detail" style="margin-top:.8rem">'+(sel?sysDetail(sel):'<p class="note">상자를 하나 눌러 보세요.</p>')+'</div>')+
+    '</section>';
+}
+function sysDetail(n){
+  var k=SYS.KIND[n.k]||SYS.KIND.dev,L=sysLtm(n),row=function(a,b){return b?'<tr><th style="width:7rem;text-align:left">'+a+'</th><td>'+esc(b)+'</td></tr>':'';};
+  return '<div class="note" style="border-left:5px solid '+k[1]+'"><b style="font-size:1.05rem">'+esc(n.t)+'</b> <span class="tag">'+k[0]+'</span>'+
+    '<table class="kt" style="margin-top:.5rem"><tbody>'+row('규격',n.spec)+row('수량',n.qty)+row('위치',n.loc)+row('도면',n.sheet)+row('메모',n.note)+row('평소 점검',n.check)+'</tbody></table>'+
+    (sysKw(n).length?'<p style="margin:.6rem 0 .2rem"><b>장기수선계획</b> <small class="muted">찾은 낱말: '+esc(sysKw(n).join(', '))+'</small></p>'+
+      (L.length?'<ul class="chk">'+L.slice(0,8).map(function(x){return '<li><b>·</b><span><b>'+esc(x.y)+'년</b> '+esc(x.n)+' <span class="muted">'+esc([x.m==='부분'?'부분 '+x.p+'%':'전면',x.g,x.loc].filter(Boolean).join(' · '))+'</span> '+LT.won(x.a)+'원</span></li>';}).join('')+'</ul>'+(L.length>8?'<p class="muted">외 '+(L.length-8)+'건</p>':'')
+        :'<p class="muted" style="margin:0">장기수선 메뉴에 계획 항목을 넣으면 여기에 함께 나옵니다.</p>'):'')+
+    '</div>';
+}
+function sysEditHtml(s){
+  var ko=Object.keys(SYS.KIND).map(function(k){return [k,SYS.KIND[k][0]];});
+  var inp=function(i,f,v,w,ph){return '<input type="text" data-sysf="'+i+'.'+f+'" value="'+esc(v)+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+' style="min-width:'+(w||6)+'rem">';};
+  var nopt=function(sel){return s.nodes.map(function(n){return '<option value="'+esc(n.id)+'"'+(n.id===sel?' selected':'')+'>'+esc(n.t)+'</option>';}).join('');};
+  return '<p class="muted" style="margin:0 0 .5rem">칸을 고치면 바로 저장됩니다. 종류에 따라 상자 색이 바뀝니다.</p>'+
+    '<label class="f"><span>이 계통 설명</span><textarea data-sysf="story" rows="3">'+esc(s.story)+'</textarea></label>'+
+    '<div style="overflow-x:auto;margin-top:.6rem"><table class="kt"><thead><tr><th>이름</th><th>종류</th><th>규격</th><th>수량</th><th>위치</th><th>도면</th><th>메모</th><th>평소 점검</th><th>장기수선 낱말</th><th></th></tr></thead><tbody>'+
+    s.nodes.map(function(n,i){return '<tr><td>'+inp(i,'t',n.t,8)+'</td><td><select data-sysf="'+i+'.k">'+ko.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===n.k?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></td><td>'+inp(i,'spec',n.spec,9)+'</td><td>'+inp(i,'qty',n.qty,5)+'</td><td>'+inp(i,'loc',n.loc,7)+'</td><td>'+inp(i,'sheet',n.sheet,5)+'</td><td>'+inp(i,'note',n.note,10)+'</td><td>'+inp(i,'check',n.check,9)+'</td><td>'+inp(i,'ltm',n.ltm,6,'예: 급수펌프')+'</td><td><button type="button" class="btn ghost sm" data-act="sysndel" data-i="'+i+'">빼기</button></td></tr>';}).join('')+
+    '</tbody></table></div><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="sysnadd">설비 추가</button></div>'+
+    '<h3 style="margin:1rem 0 .3rem">연결 <small class="muted">흐르는 방향: 출발 → 도착</small></h3><div style="overflow-x:auto"><table class="kt"><thead><tr><th>출발</th><th>도착</th><th>선 위 글자</th><th></th></tr></thead><tbody>'+
+    s.links.map(function(l,i){return '<tr><td><select data-sysl="'+i+'.a">'+nopt(l.a)+'</select></td><td><select data-sysl="'+i+'.b">'+nopt(l.b)+'</select></td><td><input type="text" data-sysl="'+i+'.t" value="'+esc(l.t)+'"></td><td><button type="button" class="btn ghost sm" data-act="sysldel" data-i="'+i+'">빼기</button></td></tr>';}).join('')+
+    '</tbody></table></div><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="syslad">연결 추가</button><button type="button" class="btn ghost sm" data-act="syssadd">계통 추가</button>'+(SQ().data.sys.length>1?'<button type="button" class="btn ghost sm" data-act="syssdel">이 계통 빼기</button>':'')+'</div>';
+}
+function sysInputEl(el){
+  var s=sysCur();if(!s)return;
+  if(el.dataset.sysf!==undefined){var p=el.dataset.sysf;if(p==='story'){s.story=el.value;}else{var a=p.split('.'),n=s.nodes[+a[0]];if(n)n[a[1]]=el.value;}save();return;}
+  if(el.dataset.sysl!==undefined){var b=el.dataset.sysl.split('.'),l=s.links[+b[0]];if(l)l[b[1]]=el.value;save();}
+}
+function sysBindFile(){var f=$('#sysfile');if(f)f.addEventListener('change',function(e){var file=e.target.files&&e.target.files[0];if(!file)return;e.target.value='';file.text().then(function(t){sysPut(t);});});}
+function sysPut(t){
+  var m=$('#sys-msg');
+  try{var j=String(t||'').trim();var a=j.indexOf('{'),b=j.lastIndexOf('}');if(a<0||b<a)throw new Error('JSON');var o=JSON.parse(j.slice(a,b+1));
+    var q=SQ();q.data=SYS.norm(o);q.ui.s=q.data.sys[0].id;q.ui.sel='';q.ui.edit=false;saveNow();sysPaint();
+    toast('계통 '+q.data.sys.length+'개, 설비 '+q.data.sys.reduce(function(s,x){return s+x.nodes.length;},0)+'개를 넣었습니다.');}
+  catch(e){if(m)m.textContent='읽지 못했습니다. AI 답 전체({ 부터 } 까지)를 붙여넣었는지 확인하세요.';else toast('읽지 못한 파일입니다.');}
+}
+function sysAct(act,a){
+  var q=SQ(),s=sysCur();
+  if(act==='sysprompt'){var t=SYS.prompt(state.complex.name);if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast('AI 부탁 글을 복사했습니다. 도면과 함께 붙여넣으세요.');},function(){toast('복사하지 못했습니다.');});return true;}
+  if(act==='sysload'){var f=$('#sysfile');if(f)f.click();return true;}
+  if(act==='syspaste'){var p=$('#sys-paste');sysPut(p?p.value:'');return true;}
+  if(act==='sysblank'){q.data=SYS.norm({name:state.complex.name,src:'직접 작성',sys:[{id:'water',t:'급수',nodes:[{id:'w1',t:'상수도 인입',k:'src'},{id:'w2',t:'지하 저수조',k:'tank',ltm:'저수조'}],links:[{a:'w1',b:'w2'}]}]});q.ui.edit=true;saveNow();sysPaint();return true;}
+  if(act==='sysclear'){if(!confirm('지금 계통도를 지우고 새 자료를 넣을까요? (먼저 "파일로 저장"을 권합니다)'))return true;q.data=null;q.ui.sel='';saveNow();sysPaint();return true;}
+  if(act==='sysfit'){q.ui.fit=!q.ui.fit;save();sysPaint();return true;}
+  if(act==='sysedit'){q.ui.edit=!q.ui.edit;saveNow();sysPaint();return true;}
+  if(act==='syssave'){saveFile('설비계통도_'+(q.data.name||state.complex.name)+'.json',new Blob([JSON.stringify(q.data,null,1)],{type:'application/json'}));return true;}
+  if(act==='syssvg'){var el=$('#sys-svg svg');if(!el){toast('그림 보기에서 저장하세요.');return true;}saveFile('계통도_'+s.t+'.svg',new Blob(['<?xml version="1.0" encoding="UTF-8"?>'+el.outerHTML.replace(/var\(--[a-z0-9-]+,(#[0-9a-f]+)\)/gi,'$1')],{type:'image/svg+xml'}));return true;}
+  if(act==='sysnadd'){var id='n'+Date.now().toString(36);s.nodes.push({id:id,t:'새 설비',k:'dev',spec:'',qty:'',loc:'',sheet:'',note:'',check:'',ltm:''});saveNow();sysPaint();return true;}
+  if(act==='sysndel'){var n=s.nodes[+a.dataset.i];if(n){s.nodes.splice(+a.dataset.i,1);s.links=s.links.filter(function(l){return l.a!==n.id&&l.b!==n.id;});}saveNow();sysPaint();return true;}
+  if(act==='syslad'){if(s.nodes.length<2){toast('설비가 두 개 이상 있어야 잇습니다.');return true;}s.links.push({a:s.nodes[0].id,b:s.nodes[1].id,t:''});saveNow();sysPaint();return true;}
+  if(act==='sysldel'){s.links.splice(+a.dataset.i,1);saveNow();sysPaint();return true;}
+  if(act==='syssadd'){var nid='s'+Date.now().toString(36);q.data.sys.push({id:nid,t:'새 계통',story:'',nodes:[],links:[]});q.ui.s=nid;saveNow();sysPaint();return true;}
+  if(act==='syssdel'){if(!confirm('"'+s.t+'" 계통을 뺄까요?'))return true;q.data.sys=q.data.sys.filter(function(x){return x!==s;});q.ui.s='';saveNow();sysPaint();return true;}
+  return false;
+}
+function sysClick(e){
+  var t=e.target.closest('[data-syss]');if(t){var q=SQ();q.ui.s=t.dataset.syss;q.ui.sel='';save();sysPaint();return true;}
+  var g=e.target.closest('[data-sysn]');if(g){var q2=SQ();q2.ui.sel=g.getAttribute('data-sysn');save();var y=window.scrollY,sc=$('#sys-svg'),sl=sc?sc.scrollLeft:0;sysPaint();window.scrollTo(0,y);var sc2=$('#sys-svg');if(sc2)sc2.scrollLeft=sl;var dt=$('#sys-detail');if(dt&&dt.getBoundingClientRect().top>window.innerHeight-80)dt.scrollIntoView({behavior:'smooth',block:'nearest'});return true;}
+  return false;
+}
+
+
 /* ═════════ 장기수선 ═════════ */
 function ltmDefault(){return {
   meta:{use:'',review:'',area:'',units:'',bal:'',balDate:'',rates:[{from:'',to:'',u:''}],intr:'',esc:'',priceY:'',done:false,end:'',types:[{a:'',n:''}],one:'',yr:''},
@@ -5688,6 +5925,7 @@ function onInput(e){
   var el=e.target;
   if(el.closest&&el.closest('#spdoc')){var ce=el.closest('[data-k]');if(ce)spInput(ce);return;}
   if(el.dataset&&el.dataset.rk!==undefined){rlKeyInput(el);return;}
+  if(el.dataset&&(el.dataset.sysf!==undefined||el.dataset.sysl!==undefined)){sysInputEl(el);if(el.tagName==='SELECT')sysPaint();return;}
   if(el.dataset&&(el.dataset.ltna!==undefined||el.dataset.ltuse!==undefined||el.dataset.ltfon!==undefined||el.dataset.ltf!==undefined||el.dataset.ltg!==undefined||el.dataset.ltkh!==undefined)){ltInputEl(el);return;}
   if(el.dataset&&el.dataset.sui!==undefined){var bq=BQ(),n=+el.dataset.sui,arr=(bq.sui||[]).map(Number).filter(function(x){return x!==n;});if(el.checked)arr.push(n);bq.sui=arr.sort(function(x,y){return x-y;});save();refreshBid();return;}
   var b=el.getAttribute&&el.getAttribute('data-bind');if(!b)return;
@@ -5724,6 +5962,7 @@ function onClick(e){
   var cv=e.target.closest('#caltabs button[data-calv]');if(cv){CQ().ui.v=cv.dataset.calv;save();calPaint();return;}
   var dr=e.target.closest('#rltabs button[data-rdoc]');if(dr){R().ui.doc=dr.dataset.rdoc;save();refreshRules();return;}
   var dt=e.target.closest('#pvtabs button[data-doc]');if(dt){state.ui.doc=dt.dataset.doc;save();refreshPreview();return;}
+  if(tab==='sys'&&sysClick(e))return;
   var a=e.target.closest('[data-act]');if(!a)return;
   var act=a.dataset.act,i=+a.dataset.i;
   if(act.indexOf('rl')===0&&rlAct(act,a))return;
@@ -5732,6 +5971,7 @@ function onClick(e){
   if(act.indexOf('rk')===0&&rkAct(act))return;
   if(act.indexOf('lt')===0&&ltAct(act,a))return;
   if(act.indexOf('cal')===0&&calAct(act,a))return;
+  if(act.indexOf('sys')===0&&sysAct(act,a))return;
   if(act==='addag'){state.agendas.push({title:'',result:'가결',discuss:'',resolution:''});save();renderAgList();refreshPreview();var inp=$$('#aglist .ag-h input');if(inp.length)inp[inp.length-1].focus();}
   else if(act==='agdel'){state.agendas.splice(i,1);save();renderAgList();refreshPreview();}
   else if(act==='agup'&&i>0){var t=state.agendas[i];state.agendas[i]=state.agendas[i-1];state.agendas[i-1]=t;save();renderAgList();refreshPreview();}
