@@ -1513,7 +1513,7 @@ var CAL = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.16.0';
+var APP_VER='1.16.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -4625,7 +4625,7 @@ function calDocBlocks(){
   return b;
 }
 function calHomeCard(){
-  var c=CQ();if(!c.fireMonth&&!c.last.elev&&!hasData())return '';
+  var c=CQ();
   var B=calBuckets(),list=B.late.concat(B.now).slice(0,6);
   return '<section class="card"><h2>이번 달 법정 업무 <small>업무달력</small></h2>'+
     '<p style="margin:0 0 .4rem"><span class="tag soon">지난 기한 '+B.late.length+'</span> <span class="tag on">이번 달 '+B.now.length+'</span> <span class="tag link">30일 안 '+B.soon.length+'</span></p>'+
