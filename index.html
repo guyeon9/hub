@@ -1377,13 +1377,143 @@ var LT=(function(){
 })();
 
 
+/* 법정 업무 달력 — 단지 조건과 최근 시행일로 기한을 계산한다.
+   근거는 2026. 11. 법제처 현행본으로 확인한 조문만 적는다(소방 자체점검·공동주택 소독 횟수는 별표라 소방서·보건소 안내문으로 확인). */
+var CAL = (function () {
+  function p2(n) { return String(n).padStart(2, '0'); }
+  function iso(y, m, d) { return y + '-' + p2(m) + '-' + p2(d); }
+  function parse(s) { var m = String(s || '').match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/); return m ? { y: +m[1], m: +m[2], d: +(m[3] || 1) } : null; }
+  function eom(y, m) { while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return iso(y, m, new Date(y, m, 0).getDate()); }
+  function addM(s, n) { var p = parse(s); if (!p) return ''; var y = p.y, m = p.m + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } var last = new Date(y, m, 0).getDate(); return iso(y, m, Math.min(p.d, last)); }
+  function addD(s, n) { var p = parse(s); if (!p) return ''; var t = new Date(p.y, p.m - 1, p.d + n); return iso(t.getFullYear(), t.getMonth() + 1, t.getDate()); }
+  function cmp(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+
+  /* 업무 목록. kind: fix(기간마다 반복) · last(최근 시행일 + 주기) · link(다른 메뉴 일정)
+     law는 확인한 조문, how는 실무 메모 */
+  var DEF = [
+    { id: 'disclose', g: '회계·공개', t: '관리비등 공개 (홈페이지·동별 게시판·K-apt)', law: '공동주택관리법 시행령 제23조제8항', how: '부과한 달의 다음 달 말일까지. 장기수선충당금은 적립요율과 사용금액, 잡수입도 함께 공개합니다.' },
+    { id: 'budget', g: '회계·공개', t: '다음 회계연도 사업계획·예산안 입대의 승인', law: '공동주택관리법 시행령 제26조제1항', how: '회계연도 시작 1개월 전까지 승인을 받아야 합니다.' },
+    { id: 'settle', g: '회계·공개', t: '사업실적서·결산서 입대의 제출', law: '공동주택관리법 시행령 제26조제3항', how: '회계연도가 끝난 뒤 2개월 이내.' },
+    { id: 'audit', g: '회계·공개', t: '외부 회계감사 받기', law: '공동주택관리법 제26조제1항·시행령 제27조제1항', how: '회계연도가 끝난 뒤 9개월 이내. 감사보고서를 받은 날부터 1개월 안에 입대의 보고와 홈페이지·동별 게시판 공개(법 제26조제3항). 300세대 이상은 입주자등 3분의 2 이상 서면동의로 그해만 생략 가능.' },
+    { id: 'safety', g: '시설 안전', t: '공동주택 안전점검 (반기)', law: '공동주택관리법 제33조제1항·시행령 제34조제1항', how: '반기마다. 16층 이상이거나 사용검사 후 30년이 지난 15층 이하 등은 책임기술자·안전점검교육 이수 소장 등 자격자가 해야 합니다(시행령 제34조제2항·제3항).' },
+    { id: 'elev', g: '시설 안전', t: '승강기 정기검사', law: '승강기 안전관리법 시행규칙 제54조', how: '직전 검사일부터 1년(설치검사 후 25년이 지난 승강기는 6개월). 도래일 전후 30일 안에 받으면 됩니다.', kind: 'last' },
+    { id: 'play', g: '시설 안전', t: '어린이놀이시설 정기시설검사', law: '어린이놀이시설 안전관리법 제12조제2항', how: '2년에 1회 이상, 안전검사기관에서.', kind: 'last' },
+    { id: 'fireA', g: '소방', t: '소방시설 작동점검', law: '소방시설법 제22조·시행규칙 제20조, 별표 3', how: '점검일부터 15일 안에 점검결과보고서를 관할 소방서에 제출. 세대 내 점검은 2년 안에 전 세대(원격점검이 안 되면 작동점검 때 50% 이상). 점검 달은 단지 소방계획서·점검계약서로 확인하세요.' },
+    { id: 'fireC', g: '소방', t: '소방시설 종합점검', law: '소방시설법 제22조·시행규칙 제20조, 별표 3', how: '점검일부터 15일 안에 결과보고서 제출. 세대 내 점검은 원격점검이 안 되면 종합점검 때 30% 이상. 종합점검 대상은 작동점검을 종합점검 후 6개월이 되는 달에 합니다.' },
+    { id: 'tank', g: '위생', t: '저수조 청소 (반기)', law: '수도법 시행규칙 제22조의4제1항', how: '반기 1회 이상. 청소 후 잔류염소·pH·탁도 확인. 아파트는 저수조를 거치지 않는 직결급수가 아니면 대상(수도법 시행령 제50조제1항제9호).' },
+    { id: 'tankM', g: '위생', t: '저수조 위생상태 점검 (월)', law: '수도법 시행규칙 제22조의4제1항', how: '월 1회 이상, 별표 6의2 점검표로.' },
+    { id: 'water', g: '위생', t: '수돗물 수질검사 (연)', law: '수도법 시행규칙 제22조의4제4항', how: '마지막 검사일부터 1년이 되는 날이 속하는 달의 말일까지. 결과는 게시판 등에 알립니다.', kind: 'last' },
+    { id: 'septic', g: '위생', t: '정화조 내부청소 (연)', law: '하수도법 시행규칙 제33조제1항제2호', how: '연 1회 이상. 공공하수처리구역이라 정화조가 없으면 해당 없음.', kind: 'last' },
+    { id: 'disinf', g: '위생', t: '소독 (300세대 이상 공동주택)', law: '감염병예방법 시행규칙 제36조제4항·별표 7', how: '4월~9월은 3개월에 1회 이상, 10월~3월은 6개월에 1회 이상.' },
+    { id: 'risk', g: '노무·안전', t: '위험성평가 정기평가', law: '사업장 위험성평가에 관한 지침(고용노동부고시 제2026-73호) 제14조', how: '매년 1회 이상. 매월 근로자 참여 평가 등 상시평가(제16조)를 하면 정기평가를 한 것으로 봅니다.', kind: 'last' },
+    { id: 'ltm', g: '장기수선', t: '장기수선계획 정기검토 (3년)', law: '공동주택관리법 제29조제2항', how: '3년마다 검토하고 그 내용을 기록·보관.' }
+  ];
+  function def(id) { for (var i = 0; i < DEF.length; i++) if (DEF[i].id === id) return DEF[i]; return null; }
+
+  function on(c, id) {
+    var h = c.have || {};
+    if (id === 'elev') return h.elev !== false;
+    if (id === 'play') return h.play !== false;
+    if (id === 'tank' || id === 'tankM' || id === 'water') return h.tank !== false;
+    if (id === 'septic') return !!h.septic;
+    if (id === 'disinf') return (+c.units || 0) >= 300 || h.disinf === true;
+    if (id === 'audit') return !c.auditSkip;
+    if (id === 'fireC') return !!h.fireFull;
+    return true;
+  }
+
+  /* from~to 사이 기한 목록 */
+  function build(c, from, to) {
+    var out = [], fy = +c.fy || 1, L = c.last || {};
+    function push(id, due, t2, extra) {
+      if (!due || due < from || due > to) return;
+      var d = def(id) || {}; var o = { id: id, key: id + '@' + due, due: due, t: t2 || d.t, g: d.g, law: d.law, how: d.how, kind: d.kind || 'fix' };
+      if (extra) for (var k in extra) o[k] = extra[k];
+      out.push(o);
+    }
+    var f = parse(from), t = parse(to);
+    // 매달
+    for (var y = f.y - 1; y <= t.y + 1; y++) for (var m = 1; m <= 12; m++) {
+      push('disclose', eom(y, m + 1), m + '월분 관리비등 공개');
+      if (on(c, 'tankM')) push('tankM', eom(y, m), '저수조 위생상태 점검 (' + m + '월)');
+    }
+    for (y = f.y - 1; y <= t.y + 1; y++) {
+      // 회계연도: fy월 1일 시작
+      var fs = iso(y, fy, 1), fe = addD(addM(fs, 12), -1);
+      push('budget', addD(addM(fs, -1), 0), y + (fy === 1 ? '' : '·' + (y + 1)) + '년 회계연도 사업계획·예산안 승인', { note: '회계연도 시작 ' + fs });
+      push('settle', eom(+fe.slice(0, 4), +fe.slice(5, 7) + 2), (fy === 1 ? y : y + '·' + (y + 1)) + '년 회계연도 결산서·사업실적서 입대의 제출');
+      if (on(c, 'audit')) push('audit', eom(+fe.slice(0, 4), +fe.slice(5, 7) + 9), (fy === 1 ? y : y + '·' + (y + 1)) + '년 회계연도 외부 회계감사');
+      push('safety', iso(y, 6, 30), y + '년 상반기 안전점검');
+      push('safety', iso(y, 12, 31), y + '년 하반기 안전점검');
+      if (on(c, 'tank')) { push('tank', iso(y, 6, 30), y + '년 상반기 저수조 청소'); push('tank', iso(y, 12, 31), y + '년 하반기 저수조 청소'); }
+      if (on(c, 'disinf')) {
+        push('disinf', iso(y, 3, 31), (y - 1) + '.10~' + y + '.3월 소독 (6개월에 1회)');
+        push('disinf', iso(y, 6, 30), y + '.4~6월 소독 (3개월에 1회)');
+        push('disinf', iso(y, 9, 30), y + '.7~9월 소독 (3개월에 1회)');
+      }
+      var fm = +c.fireMonth || 0;
+      if (fm) {
+        if (on(c, 'fireC')) { push('fireC', eom(y, fm), y + '년 소방시설 종합점검 (' + fm + '월)'); var am = fm + 6 > 12 ? fm - 6 : fm + 6; push('fireA', eom(y, am), y + '년 소방시설 작동점검 (' + am + '월)'); }
+        else push('fireA', eom(y, fm), y + '년 소방시설 작동점검 (' + fm + '월)');
+      }
+    }
+    // 최근 시행일 + 주기
+    function cyc(id, months, lastIso, label) {
+      if (!on(c, id)) return;
+      if (!lastIso) { out.push({ id: id, key: id + '@?', due: '', t: (def(id) || {}).t, g: (def(id) || {}).g, law: (def(id) || {}).law, how: (def(id) || {}).how, kind: 'last', need: 1 }); return; }
+      var d = lastIso, n = 0;
+      while (n++ < 60) { d = addM(d, typeof months === 'function' ? months(d) : months); var dd = id === 'water' ? eom(+d.slice(0, 4), +d.slice(5, 7)) : d; if (dd > to) break;
+        if (dd >= from) push(id, dd, label, { from: lastIso });
+        else if (n === 1 || addM(d, typeof months === 'function' ? months(d) : months) > from) { var o = def(id); out.push({ id: id, key: id + '@' + dd, due: dd, t: label || o.t, g: o.g, law: o.law, how: o.how, kind: 'last', from: lastIso }); } }
+    }
+    cyc('elev', function (d) { var iy = +c.elevYear || 0; return iy && (+d.slice(0, 4) - iy) >= 25 ? 6 : 12; }, L.elev);
+    cyc('play', 24, L.play);
+    cyc('water', 12, L.water);
+    cyc('septic', 12, L.septic);
+    cyc('risk', 12, L.risk);
+    (c.custom || []).forEach(function (x, i) {
+      if (!x.name || !+x.cyc) return;
+      if (!x.last) { out.push({ id: 'cu' + i, key: 'cu' + i + '@?', due: '', t: x.name, g: '직접 추가', law: x.law || '', how: '', kind: 'last', need: 1, cu: i }); return; }
+      var d = x.last, n = 0; while (n++ < 120) { d = addM(d, +x.cyc); if (d > to) break; if (d >= from || addM(d, +x.cyc) > from) out.push({ id: 'cu' + i, key: 'cu' + i + '@' + d, due: d, t: x.name, g: '직접 추가', law: x.law || '', how: '주기 ' + x.cyc + '개월', kind: 'last', cu: i }); }
+    });
+    // 장기수선 정기검토
+    if (c.ltmReview) { var r = addM(c.ltmReview + (c.ltmReview.length === 7 ? '-01' : ''), 36), rd = eom(+r.slice(0, 4), +r.slice(5, 7)); push('ltm', rd, '장기수선계획 정기검토 (직전 ' + c.ltmReview.slice(0, 7).replace('-', '.') + ')'); }
+    // 다른 메뉴 일정
+    (c.links || []).forEach(function (x) { if (x.due && x.due >= from && x.due <= to) out.push({ id: 'ln', key: 'ln:' + x.src + ':' + x.t + '@' + x.due, due: x.due, t: x.t, g: x.src, law: x.law || '', how: x.how || '', kind: 'link' }); });
+    out.sort(function (a, b) { return cmp(a.due || '9999', b.due || '9999') || cmp(a.g || '', b.g || ''); });
+    return out;
+  }
+  function status(x, today, done) {
+    if (x.need) return 'need';
+    if (done && done[x.key]) return 'done';
+    if (x.due < today) return 'late';
+    if (x.due.slice(0, 7) === today.slice(0, 7)) return 'now';
+    if (x.due <= addD(today, 30)) return 'soon';
+    return 'later';
+  }
+  function ics(list, apt) {
+    var stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    var e = function (t) { return String(t).replace(/[\\;,]/g, function (m) { return '\\' + m; }).replace(/\n/g, '\\n'); };
+    var ev = list.filter(function (x) { return x.due; }).map(function (x, i) {
+      var d = x.due.replace(/-/g, ''), d2 = addD(x.due, 1).replace(/-/g, '');
+      return ['BEGIN:VEVENT', 'UID:cal-' + d + '-' + i + '@guyeon-hub', 'DTSTAMP:' + stamp, 'DTSTART;VALUE=DATE:' + d, 'DTEND;VALUE=DATE:' + d2,
+        'SUMMARY:' + e('[기한] ' + x.t), 'DESCRIPTION:' + e((apt ? apt + '\n' : '') + (x.law ? '근거: ' + x.law + '\n' : '') + (x.how || '')),
+        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + e('7일 남음: ' + x.t), 'END:VALARM',
+        'BEGIN:VALARM', 'TRIGGER;RELATED=START:PT9H', 'ACTION:DISPLAY', 'DESCRIPTION:' + e('오늘 기한: ' + x.t), 'END:VALARM', 'END:VEVENT'].join('\r\n');
+    });
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//guyeon-hub//cal//KO', 'CALSCALE:GREGORIAN'].concat(ev).concat(['END:VCALENDAR']).join('\r\n') + '\r\n';
+  }
+  return { DEF: DEF, def: def, build: build, status: status, ics: ics, addM: addM, addD: addD, eom: eom, parse: parse };
+})();
+
+
 (function(){
 'use strict';
 
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.14.3';
+var APP_VER='1.16.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -1394,6 +1524,7 @@ function defaultState(){
       noticeDate:'',resultDate:'',resultEnd:'',noticeLead:'5',noticeNo:'',resultNo:'',audience:DEFAULT_AUD},
     agendas:[],
     risk:{url:'',key:''},
+    cal:calDefault(),
     kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:''},
     safety:{ver:SP_VER,edits:{}},
     rules:rulesDefault(),
@@ -1990,7 +2121,9 @@ function inflateRaw(src){
   return Promise.resolve(out.subarray(0,op));
   }catch(e){return op>0?Promise.resolve(out.subarray(0,op)):Promise.reject(new Error('inflate'));}
 }
-function hwpText(buf){
+/* .hwp 본문 레코드를 훑어 글자 줄(text)과 표(tables: 칸 주소·병합을 살린 2차원 배열)를 함께 만든다.
+   레코드: 67 문단 글자, 77 표 정보(행·열 수), 72 칸 머리(열·행 주소, 병합 수) */
+function hwpRead(buf){
   try{var C=cfbRead(buf);}catch(e){return Promise.reject(e);}
   var fh=C.find(['FileHeader']);if(!fh)return Promise.reject(new Error('hwp'));
   var hd=C.data(fh),prop=hd[36]|(hd[37]<<8)|(hd[38]<<16)|(hd[39]<<24);
@@ -1999,17 +2132,57 @@ function hwpText(buf){
   var bt=C.find(['BodyText']);if(!bt)return Promise.reject(new Error('hwp'));
   var secs=C.kids(bt).filter(function(x){return /^Section\d+$/.test(x.n);}).sort(function(a,b){return +a.n.slice(7)-+b.n.slice(7);});
   return Promise.all(secs.map(function(s){var d=C.data(s);return (prop&1)?inflateRaw(d):Promise.resolve(d);})).then(function(parts){
-    var out=[];
+    var out=[],tables=[],stack=[];
+    function close(lv){while(stack.length&&lv<stack[stack.length-1].lv)tables.push(tblGrid(stack.pop()));}
     parts.forEach(function(d){var v=new DataView(d.buffer,d.byteOffset,d.byteLength),p=0;
-      while(p+4<=d.length){var h=v.getUint32(p,true),tag=h&0x3FF,sz=h>>>20;p+=4;if(sz===0xFFF){if(p+4>d.length)break;sz=v.getUint32(p,true);p+=4;}if(p+sz>d.length)sz=d.length-p;
-        if(tag===67){var s='',q=p,e=p+sz;while(q+1<e){var ch=v.getUint16(q,true);
+      while(p+4<=d.length){var h=v.getUint32(p,true),tag=h&0x3FF,lv=(h>>>10)&0x3FF,sz=h>>>20;p+=4;if(sz===0xFFF){if(p+4>d.length)break;sz=v.getUint32(p,true);p+=4;}if(p+sz>d.length)sz=d.length-p;
+        close(lv);
+        var top=stack.length?stack[stack.length-1]:null;
+        if(tag===77&&sz>=8){stack.push({lv:lv,nr:v.getUint16(p+4,true),nc:v.getUint16(p+6,true),cells:[],cur:null});}
+        else if(tag===72&&top&&lv===top.lv&&sz>=16){top.cur={c:v.getUint16(p+8,true),r:v.getUint16(p+10,true),cs:v.getUint16(p+12,true)||1,rs:v.getUint16(p+14,true)||1,t:[]};top.cells.push(top.cur);}
+        else if(tag===67){var s='',q=p,e=p+sz;while(q+1<e){var ch=v.getUint16(q,true);
             if(ch>=32){s+=String.fromCharCode(ch);q+=2;}
             else if(ch===10){s+='\n';q+=2;}else if(ch===13||ch===0){q+=2;}else if(ch===24){s+='-';q+=2;}else if(ch>=25&&ch<=31){s+=' ';q+=2;}
             else{if(ch===9)s+=' ';q+=16;}}
-          out.push(s);}
+          out.push(s);if(top&&top.cur&&lv>top.lv)top.cur.t.push(s);}
         p+=sz;}});
-    return out.join('\n');
+    close(-1);
+    return {text:out.join('\n'),tables:tables};
   });
+}
+function hwpText(buf){return hwpRead(buf).then(function(r){return r.text;});}
+/* 칸 목록 → 2차원 표. 병합된 칸은 덮인 자리마다 같은 글자를 채워 넣는다(연도 칸 세로 병합 대비). */
+function tblGrid(T){
+  var nr=T.nr||0,nc=T.nc||0;T.cells.forEach(function(c){nr=Math.max(nr,c.r+c.rs);nc=Math.max(nc,c.c+c.cs);});
+  var g=[];for(var r=0;r<nr;r++){g.push([]);for(var c=0;c<nc;c++)g[r].push('');}
+  T.cells.forEach(function(c){var s=c.t.join(' ').replace(/\s+/g,' ').trim();for(var r=c.r;r<c.r+c.rs&&r<nr;r++)for(var k=c.c;k<c.c+c.cs&&k<nc;k++)g[r][k]=s;});
+  return g;
+}
+/* .hwpx(zip) 안의 표를 같은 모양으로 꺼낸다 */
+function hwpxTables(zip){
+  var files=Object.keys(zip.files).filter(function(f){return /Contents\/section\d+\.xml$/.test(f);}).sort(function(a,b){return parseInt(a.replace(/\D/g,''),10)-parseInt(b.replace(/\D/g,''),10);});
+  return Promise.all(files.map(function(f){return zip.file(f).async('string');})).then(function(xs){
+    var tables=[];
+    xs.forEach(function(x){var doc=new DOMParser().parseFromString(x,'application/xml');
+      var tbls=doc.getElementsByTagNameNS('*','tbl');
+      for(var i=0;i<tbls.length;i++){var tb=tbls[i],T={nr:+tb.getAttribute('rowCnt')||0,nc:+tb.getAttribute('colCnt')||0,cells:[]};
+        var tcs=tb.getElementsByTagNameNS('*','tc');
+        for(var j=0;j<tcs.length;j++){var tc=tcs[j],own=tc.parentNode&&tc.parentNode.parentNode;if(own!==tb)continue;
+          var ad=tc.getElementsByTagNameNS('*','cellAddr')[0],sp=tc.getElementsByTagNameNS('*','cellSpan')[0];
+          var ts=tc.getElementsByTagNameNS('*','t'),t=[];for(var k=0;k<ts.length;k++){var tt=ts[k],up=tt.parentNode;while(up&&up!==tc&&up.localName!=='tbl')up=up.parentNode;if(up===tc)t.push(tt.textContent);}
+          T.cells.push({c:+(ad&&ad.getAttribute('colAddr'))||0,r:+(ad&&ad.getAttribute('rowAddr'))||0,cs:+(sp&&sp.getAttribute('colSpan'))||1,rs:+(sp&&sp.getAttribute('rowSpan'))||1,t:t});}
+        tables.push(tblGrid(T));}});
+    return tables;
+  });
+}
+/* 여러 표 가운데 머리줄(hA·hB가 모두 있는 줄)이 있는 표를 찾아, 그 뒤로 같은 칸 수의 표를 이어 붙인다(쪽마다 나뉜 계획표). */
+function pickTable(tables,hA,hB){
+  var nz=function(x){return String(x).replace(/\s/g,'');},start=-1,hr=-1;
+  for(var i=0;i<tables.length&&start<0;i++)for(var r=0;r<Math.min(tables[i].length,6);r++){var ns=tables[i][r].map(nz);if(ns.some(function(x){return hA.test(x);})&&ns.some(function(x){return hB.test(x);})){start=i;hr=r;break;}}
+  if(start<0)return null;
+  var nc=tables[start][0].length,rows=tables[start].slice(hr);
+  for(var k=start+1;k<tables.length;k++){if(tables[k].length&&tables[k][0].length===nc)rows=rows.concat(tables[k]);}
+  return rows;
 }
 
 var HX_ON=false;
@@ -2066,6 +2239,7 @@ function fname(kind){var L=ML();return docsMeta[kind]+'_'+state.complex.name+'_'
 /* ═════════ 화면 ═════════ */
 var TABS=[
   {id:'home',t:'홈'},
+  {id:'cal',t:'업무달력'},
   {id:'agenda',t:'안건·공고'},
   {id:'safety',t:'안전관리계획'},
   {id:'risk',t:'위험성평가',s:'연결'},
@@ -2106,7 +2280,7 @@ function go(id,noHash){
   tab=id;
   $$('#tabs button').forEach(function(b){if(b.dataset.tab===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   var v=$('#view');
-  ({home:renderHome,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm}[id]||renderSoon)(v,id);
+  ({home:renderHome,cal:renderCal,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm}[id]||renderSoon)(v,id);
   if(!noHash){try{history.replaceState(null,'','#'+id);}catch(e){}}
   window.scrollTo(0,0);
 }
@@ -2129,7 +2303,7 @@ function renderHome(v){
   var nEd=Object.keys(state.safety.edits||{}).length;
   v.innerHTML=
   bkNote()+'<h1 class="h-title">구연 관리도우미</h1><p class="lead">단지 정보를 한 번만 입력하면 모든 메뉴가 같이 씁니다. 안건·공고, 안전관리계획, 관리규약 개정, 입찰·계약, 선거를 쓸 수 있고, 나머지 메뉴는 순서대로 열립니다.</p>'+
-  '<div class="home-grid"><div>'+
+  '<div class="home-grid"><div>'+calHomeCard()+
     '<section class="card"><h2>단지 정보 <small>모든 메뉴에서 공통으로 사용</small></h2><div class="grid2">'+
       F('단지명','complex.name',c.name)+F('입주자대표회의 명칭','complex.council',c.council)+
       F('세대수','complex.units',c.units)+F('관리소장','complex.director',c.director)+
@@ -3202,7 +3376,7 @@ function bidDefault(){return {kind:'elev',name:'',path:'auto',sui:[],amt:'',amtM
   cx:{tarea:'',marea:'',heat:'',usedate:'',fax:'',office:'',ev:''},agent:'',pay:'',acct:'',conVat:'포함',bizno:'',proxy:true,
   pt:{on:false,date:'',time:'10:00',min:'10',copies:'6'},tech:'',equip:'',evalOn:false,eval:null,staff:[],cos:[],
   wage:{hourly:'10700',pension:'5.0',health:'3.595',ltc:'13.90',emp:'1.15',acc:'',annual:true,uniform:'12000',supplies:'4000',edu:'5000',check:'3000',mgmt:'1',profit:'1'},
-  win:{name:'',addr:'',ceo:'',tel:'',bizno:'',amt:'',period:'',eval:''},ui:{doc:'judge'}};}
+  win:{name:'',addr:'',ceo:'',tel:'',bizno:'',amt:'',period:'',eval:''},self:{},ui:{doc:'judge'}};}
 var bdMerged=false;
 function BQ(){
   if(state.bid){if(!state.bids||(state.bids.length===1&&!state.bids[0].name&&!state.bids[0].amt)){state.bids=[merge(bidDefault(),state.bid)];state.bidCur=0;}delete state.bid;}
@@ -3420,7 +3594,7 @@ function renderBid(v){
   '</div></section>'+
   '</div><div>'+
     '<div class="pv-tabs" id="bdtabs" role="group" aria-label="서류 종류">'+
-      [['judge','검토·의결자료'],['notice','입찰공고문'],['kapt','K-apt 등록값'],['score','적격심사 집계'],['result','선정결과 공고'],['sched','일정·기한'],['check','점검']].map(function(x){return '<button type="button" data-bdoc="'+x[0]+'">'+x[1]+'</button>';}).join('')+
+      [['judge','검토·의결자료'],['notice','입찰공고문'],['kapt','K-apt 등록값'],['score','적격심사 집계'],['result','선정결과 공고'],['sched','일정·기한'],['check','점검'],['self','자가점검표']].map(function(x){return '<button type="button" data-bdoc="'+x[0]+'">'+x[1]+'</button>';}).join('')+
     '</div><div id="bdbar" class="pv-bar"></div><div id="bdpv"></div>'+
   '</div></div>';
   paintStaff();paintEval();refreshBid(true);
@@ -3486,6 +3660,7 @@ function refreshBid(now){
     var bar=$('#bdbar'),pv=$('#bdpv');
     if(kind==='sched'){bar.innerHTML='';pv.innerHTML=bidSchedHtml(S,1);return;}
     if(kind==='check'){bar.innerHTML='';pv.innerHTML='<ul class="chk">'+bidChecks(J,S).map(function(c){return '<li class="'+(c.ok?'ok':'warn')+'"><b>'+(c.ok?'✓':'!')+'</b><span>'+esc(c.t)+'</span></li>';}).join('')+'</ul>';return;}
+    if(kind==='self'){bar.innerHTML='<button type="button" class="btn" data-act="bddocx" data-kind="self">자가점검표 Word로 저장</button><button type="button" class="btn ghost" data-act="bddocx" data-kind="self" data-hx="1">자가점검표 한글로 저장</button><span class="muted">결재·감사 대비 증빙으로 보관하세요.</span>';pv.innerHTML=bidSelfHtml(J);return;}
     if(kind==='kapt'){bar.innerHTML='<button type="button" class="btn" data-act="bdkcopy">표 내용 복사</button><span class="muted">K-apt 입찰 등록 화면에 이 순서대로 옮겨 적으세요.</span>';pv.innerHTML=bidKaptHtml(J,S);return;}
     if(kind==='score'){bar.innerHTML='<button type="button" class="btn" data-act="bddocx" data-kind="score">집계표 Word로 저장</button><button type="button" class="btn ghost" data-act="bddocx" data-kind="score" data-hx="1">집계표 한글로 저장</button><button type="button" class="btn ghost" data-act="bdscadd">업체 추가</button>';pv.innerHTML=bidScoreHtml(J);return;}
     var d=bidDoc(kind,J,S);
@@ -3557,6 +3732,7 @@ function bidDoc(kind,J,S){
   if(kind==='result')return {blocks:bidResultBlocks(J,S),opt:{border:1},name:'선정결과공고'};
   if(kind==='score')return {blocks:bidScoreBlocks(J),opt:{landscape:1,margins:[1134,1134,1134,1134]},name:'적격심사집계표'};
   if(kind==='wage')return {blocks:bidWageBlocks(),opt:{landscape:1,margins:[1134,1134,1134,1134]},name:'산출내역서'};
+  if(kind==='self')return {blocks:bidSelfBlocks(J),opt:{margins:[1134,1134,1134,1134],footer:1},name:'선정절차자가점검표'};
   return {blocks:bidJudgeBlocks(J,S),opt:{},name:'선정방법검토'};
 }
 function H2(t){return P(t,{sz:23,b:1,sp:[200,80,0],kn:1});}
@@ -3766,6 +3942,75 @@ function bidWageBlocks(){
   out.push(P('※ 예정가격·입찰가격 상한 판단용 참고 계산입니다. 감시단속적 근로 승인 여부, 연장근로, 업종별 산재요율 등 실제 조건을 반영하세요.',{sz:17,co:'555555',sp:[60,0,0]}));
   return out;
 }
+/* 선정 절차 자가점검 — 화면이 입력값으로 알 수 없는 "실제로 그렇게 했는지"를 소장이 직접 확인한다.
+   근거: 주택관리업자 및 사업자 선정지침(국토교통부 고시 제2024-196호), 공동주택관리법 제28조 */
+function bidSelfItems(J){
+  var k=J.k,g=k.g,mgr=g==='관리업자',sui=J.path==='수의계약',comp=!sui,aw=comp&&J.award==='적격심사제',b=BQ();
+  var A=function(m,s){return mgr?m:s;},L=[];
+  var add=function(id,ph,q,law,on){if(on!==false)L.push({id:id,ph:ph,q:q,law:law});};
+  add('budget','준비','올해 사업계획·예산을 잡을 때 K-apt 사업비 비교 등으로 다른 단지 금액을 확인했습니다.','지침 제3조제7항');
+  add('vote','준비',A('입찰 방법·낙찰 방법·참가자격 제한을 입대의 의결로 제안하고, 전체 입주자등 과반수 동의를 받았습니다.','입찰 방법·낙찰 방법·참가자격 제한 등 중요 사항을 공고 전에 입대의에서 의결했습니다.'),'지침 제4조제4항',comp);
+  add('suiv','준비',A('수의계약 상대자·계약 조건을 입대의 의결로 제안하고, 전체 입주자등 과반수 동의를 받았습니다.','계약 상대자와 계약 조건을 수의계약 전에 입대의에서 의결했습니다.'),'지침 제4조제5항',sui);
+  add('suir','준비','수의계약 사유가 지침 별표 2의 어느 호에 해당하는지 확인하고 의결 자료에 적었습니다.','지침 제4조제3항·별표 2',sui);
+  add('nego','준비','"협의해서 정하기", "우선협상대상자 선정"처럼 경쟁입찰이 아닌 방식을 섞지 않았습니다.','지침 제5조제2항',comp);
+  add('qual','공고','참가자격 제한은 지침(제한경쟁이면 별표 1 포함)이 허용하는 범위에서만 걸었습니다. 영업지역 제한처럼 지침에 없는 조건은 넣지 않았습니다.',A('지침 제18조, 별표 1','지침 제26조, 별표 1'),comp);
+  add('docs','공고','업체에 요구한 제출서류가 지침의 목록 안에 있습니다. 목록 밖의 서류는 요구하지 않았습니다.',A('지침 제19조','지침 제27조'),comp);
+  add('table','공고','적격심사 평가배점표를 세부 배점 간격까지 적어 공고에 붙였습니다.',A('지침 제16조제1항제4호','지침 제24조제1항제3호'),aw);
+  add('cap','공고','입찰가격 상한(잡수입은 하한)을 공고했다면 3곳 이상 견적서 등 지침의 근거를 갖췄습니다.','지침 제24조제5항',comp&&!mgr&&(!!b.cap||g==='잡수입'));
+  add('defect','공고','하자보수보증금 예치율을 입대의에서 따로 정했다면 공고문에 그 비율을 적었습니다.','지침 제24조제1항제11호·제32조제2항',comp&&g==='공사');
+  add('three','공고','공고를 단지 홈페이지, 동별 게시판, K-apt 세 곳 모두에 올렸습니다.',A('지침 제14조','지침 제22조'),comp);
+  add('same','공고','전자입찰 화면에 쓴 내용과 붙임 공고문의 내용(특히 일정)이 서로 같습니다.',A('지침 제16조제4항','지침 제24조제4항'),comp);
+  add('site','공고','현장설명회에서 공고에 없는 제출서류나 참가자격을 새로 말하지 않았습니다.',A('지침 제17조','지침 제25조'),comp&&!!b.site);
+  add('rebid','공고','재공고하면서 공고기간 말고는 처음 공고 내용을 바꾸지 않았습니다(제한경쟁 요건을 푸는 것만 가능).','지침 제12조제2항',comp&&!!b.rebid);
+  add('open','개찰·심사','개찰을 공고한 일정대로 했습니다. 일정을 바꿨다면 입찰 업체 등 이해관계인에게 알렸습니다.','지침 제9조',comp);
+  add('after','개찰·심사','업체 제출서류는 개찰한 뒤에 검토했고, 유효한 입찰이 2곳(제한경쟁은 3곳) 이상인지 확인했습니다.','지침 제5조제1항·제10조제1항',comp);
+  add('void','개찰·심사','무효로 처리한 입찰이 있으면 그 업체에 무효 이유를 알렸습니다.','지침 제6조제2항',comp);
+  add('panel','개찰·심사',k.who==='입주자대표회의'||mgr?'평가위원에 입대의 구성원이 아닌 입주자등이나 외부위원을 1명 이상 넣었습니다.':'평가위원에 입대의 구성원이 아닌 입주자등을 1명 이상 넣었습니다(관리주체가 계약자인 경우 입주자등으로만 구성).','지침 제13조제1항',aw);
+  add('five','개찰·심사','평가에 5명 이상이 실제로 참여했습니다(5명 미만이면 평가 결과가 효력이 없습니다).','지침 제13조제2항',aw);
+  add('self2','개찰·심사','위탁관리회사 임직원이 운영하는 업체가 입찰에 들어왔다면, 그 회사 소속 관리소장은 평가위원에서 빠졌습니다.','지침 제13조제1항제2호 단서',aw&&k.who==='관리주체');
+  add('minutes','개찰·심사','적격심사 회의록과 평가표를 작성해 보관하고 있습니다(입주자등이 열람·복사를 요구하면 응해야 합니다).','지침 제13조제3항',aw);
+  add('tie','개찰·심사','같은 점수(같은 가격)가 나왔다면 지침 순서대로 정했고, 추첨은 이해관계인이 참석한 자리에서 했습니다.','지침 제7조제3항·제4항, 제10조제3항',comp);
+  add('pub','결정·계약','선정 결과를 결정일 다음 근무일 18시까지 홈페이지·동별 게시판·K-apt에 공개했습니다'+(sui?'(수의계약은 그 사유 포함).':'.'),'지침 제11조');
+  add('equal','결정·계약','계약서 내용이 입찰 정보·낙찰 금액과 같습니다.',A('지침 제21조제2항','지침 제29조제2항'),!sui);
+  add('ten','결정·계약','낙찰 후 10일 안에 계약했습니다(넘기면 낙찰이 무효가 될 수 있습니다).',A('지침 제21조제3항','지침 제29조제3항'),comp);
+  add('bond','결정·계약','계약보증금('+(g==='공사'?'계약금액의 20%':'계약금액의 10%')+')을 받았거나, 면제 사유(500만원 이하 등)를 기록해 두었습니다.','지침 제31조제3항·제4항',g!=='보험');
+  add('ins4','결정·계약','계약 후 1개월 안에 4대보험 가입증명서를 받았습니다.',A('지침 제21조제4항','지침 제29조제5항'),mgr||isResident(k));
+  add('cpub','결정·계약','계약서를 체결일부터 1개월 안에 홈페이지·동별 게시판에 공개했습니다(개인정보는 가리고).','공동주택관리법 제28조');
+  return L;
+}
+function bidSelfHtml(J){
+  var b=BQ(),A=b.self||{},L=bidSelfItems(J),ph='',h='',n={y:0,n:0,x:0};
+  L.forEach(function(it){var v=A[it.id];if(v)n[v]++;});
+  var left=L.length-n.y-n.n-n.x;
+  h+='<p style="margin:0 0 .4rem"><b>'+esc(k_t(J))+'</b> · 확인할 항목 '+L.length+'개 — <span class="tag on">예 '+n.y+'</span> <span class="tag soon">아니오 '+n.n+'</span> <span class="tag link">해당없음 '+n.x+'</span>'+(left?' · 남은 항목 '+left+'개':'')+'</p>';
+  h+='<p class="muted" style="margin:0 0 .8rem">"점검" 탭은 입력한 값으로 자동 확인하고, 이 표는 화면이 알 수 없는 "실제로 그렇게 했는지"를 직접 확인합니다. 선택한 사업 종류와 선정 방법에 맞는 항목만 나옵니다. "아니오"가 있으면 해당 조문을 다시 확인하세요.</p><ol class="chk" style="list-style:none;padding:0">';
+  L.forEach(function(it){
+    if(it.ph!==ph){ph=it.ph;h+='<li style="border:0;padding:.6rem 0 .2rem;font-weight:700;color:var(--accent)">'+esc(ph)+'</li>';}
+    var v=A[it.id],bt=function(val,lab,cls){return '<button type="button" class="btn sm'+(v===val?'':' ghost')+'" data-act="bdself" data-id="'+it.id+'" data-v="'+val+'"'+(v===val?' aria-pressed="true"':'')+' style="min-width:3.6rem">'+lab+'</button>';};
+    h+='<li class="'+(v==='y'||v==='x'?'ok':v==='n'?'warn':'')+'" style="align-items:flex-start;gap:.6rem;flex-wrap:wrap"><b>'+(v==='y'?'✓':v==='n'?'!':v==='x'?'－':'?')+'</b><span style="flex:1;min-width:12rem">'+esc(it.q)+'<br><small class="muted">'+esc(it.law)+'</small></span><span class="row" style="gap:.3rem;flex:none;margin-left:auto">'+bt('y','예')+bt('n','아니오')+bt('x','해당없음')+'</span></li>';
+  });
+  h+='</ol><div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-act="bdselfclr">답 모두 지우기</button></div>';
+  return h;
+}
+function k_t(J){return J.k.t+(J.path==='수의계약'?' · 수의계약':' · '+BQ().type+'입찰'+(J.award?' · '+J.award:''));}
+function bidSelfBlocks(J){
+  var b=BQ(),A=b.self||{},L=bidSelfItems(J),apt=state.complex.name;
+  var hd=function(t){return {t:t,b:1,f:'E7E6E6',al:'c',sz:18};},c=function(t,al,sz){return {t:t,al:al||'l',sz:sz||18};};
+  var mk=function(v,x){return (v===x?'■':'□');};
+  var blk=[];
+  blk.push(P(apt+' 사업자 선정 절차 자가점검표',{al:'center',b:1,sz:30,sp:[0,120,0]}));
+  blk.push(P('사업: '+(bidName()||J.k.t)+'   /   '+k_t(J),{al:'center',sz:20,sp:[0,60,0]}));
+  blk.push(P('근거: 주택관리업자 및 사업자 선정지침(국토교통부 고시 제2024-196호), 공동주택관리법 제28조',{al:'center',sz:17,co:'666666',sp:[0,200,0]}));
+  var rows=[{c:[hd('단계'),hd('점검 내용'),hd('근거'),hd('확인')],hd:1,h:[420,'atLeast']}],ph='';
+  L.forEach(function(it){var v=A[it.id];rows.push({c:[c(it.ph!==ph?it.ph:'','c',17),c(it.q),c(it.law,'l',16),c(mk(v,'y')+' 예\n'+mk(v,'n')+' 아니오\n'+mk(v,'x')+' 해당없음','l',16)]});ph=it.ph;});
+  blk.push({k:'t',w:[1150,5300,1900,1222],c:1,rows:rows,split:1});
+  var nn=L.filter(function(it){return A[it.id]==='n';});
+  blk.push(P('※ "아니오" '+nn.length+'건'+(nn.length?': '+nn.map(function(it){return it.law;}).join(', ')+' — 조치 내용을 아래에 적습니다.':''),{sz:19,sp:[200,80,0]}));
+  blk.push({k:'t',w:[9572],c:1,rows:[{c:[{t:'조치 내용',sz:18,al:'l',va:'top'}],h:[1100,'atLeast']}]});
+  blk.push(P('점검일:      년    월    일',{al:'right',sz:20,sp:[260,160,0]}));
+  blk.push({k:'t',w:[3190,3191,3191],c:1,rows:[{c:[hd('점검자 (관리사무소장)'),hd('확인 (입대의 감사)'),hd('확인 (입대의 회장)')],h:[420,'atLeast']},{c:[c('(인)','r'),c('(인)','r'),c('(인)','r')],h:[700,'atLeast']}]});
+  return blk;
+}
 function bidChecks(J,S){
   var b=BQ(),k=J.k,o=[],aw=J.award==='적격심사제'&&J.path!=='수의계약';
   o.push({ok:!J.notes.some(function(n){return n.bad;}),t:J.notes.length?'판정: '+J.notes.map(function(n){return n.t;}).join(' '):'판정: 선택한 사업 종류와 선정 방법이 지침 별표 7에 맞습니다.'});
@@ -3906,6 +4151,8 @@ function paintAw(){
 function bdAct(act,a){
   if(bdExAct(act,a))return true;
   var b=BQ(),re=function(){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);};
+  if(act==='bdself'){var bs=BQ();bs.self=bs.self||{};var id=a.dataset.id,v=a.dataset.v;if(bs.self[id]===v)delete bs.self[id];else bs.self[id]=v;save();refreshBid(true);return true;}
+  if(act==='bdselfclr'){BQ().self={};save();refreshBid(true);return true;}
   if(act==='bddocx'){var J=bidJ(),S=BD.schedule(b,J),d=bidDoc(a.dataset.kind,J,S);makeDocx(d.blocks,d.opt).then(function(blob){return saveFile(d.name+'_'+bidName()+'_'+state.complex.name+'.docx',blob);}).catch(function(){toast('문서를 만들지 못했습니다.');});return true;}
   if(act==='bdnew'){var nb=bidDefault();nb.place=b.place;nb.tel=b.tel;nb.addr=b.addr;nb.dongs=b.dongs;nb.cx=JSON.parse(JSON.stringify(b.cx));nb.acct=b.acct;nb.bizno=b.bizno;nb.agent=b.agent;nb.eval=evalDefault(nb.kind);state.bids.push(nb);state.bidCur=state.bids.length-1;saveNow();re();toast('새 건을 만들었습니다. 단지 현황은 이어서 씁니다.');return true;}
   if(act==='bdcopy'){var cp=JSON.parse(JSON.stringify(b));cp.name=bidName()+' (복사)';cp.win=bidDefault().win;cp.cos=[];state.bids.push(cp);state.bidCur=state.bids.length-1;saveNow();re();return true;}
@@ -4269,6 +4516,142 @@ function paintRisk(){
   else f.innerHTML='<section class="card"><h2>들어 있는 기능</h2><ul class="road"><li>순회점검, TBM, 근로자회의, 교육, 도급협의 기록</li><li>위험장소 지정과 개선대책 관리(개선 전후 사진)</li><li>근로자 QR 익명 신고와 즉시 메일 알림</li><li>월간 보고서 자동 작성(서명란 포함)</li></ul></section>';
 }
 
+/* ═════════ 업무달력 ═════════ */
+function calDefault(){return {fy:'1',have:{elev:true,play:true,tank:true,septic:false,fireFull:true,disinf:false},fireMonth:'',elevYear:'',last:{elev:'',play:'',water:'',septic:'',risk:''},custom:[],done:{},auditSkip:false,ui:{v:'now'}};}
+function CQ(){if(!state.cal||!state.cal.last)state.cal=merge(calDefault(),state.cal||{});if(!state.cal.since){var t=calToday();state.cal.since=t.slice(0,8)+'01';}return state.cal;}
+function calToday(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+/* 다른 메뉴에 들어 있는 날짜를 달력으로 가져온다 */
+function calLinks(){
+  var L=[];
+  try{var p=R().proc;if(p.fixDate)L.push({t:'관리규약 개정 신고 (구청)',due:addDays(p.fixDate,30),src:'관리규약',law:'공동주택관리법 시행령 제21조',how:'개정된 날부터 30일 이내'});}catch(e){}
+  try{var b=BQ(),J=bidJ(),S=BD.schedule(b,J),nm=bidName(b);
+    S.rows.forEach(function(r){if(!r.d||!/^\d{4}-\d\d-\d\d$/.test(r.d))return;if(/^(pub|con|ins4|due|open|notice)$/.test(r.k))L.push({t:nm+': '+r.t,due:r.d,src:'입찰·계약',law:r.law,how:r.note});});
+    var con=(S.rows.filter(function(r){return r.k==='con';})[0]||{}).d||b.conDate;
+    if(con&&/^\d{4}-\d\d-\d\d$/.test(con))L.push({t:nm+': 계약서 공개 (홈페이지·동별 게시판)',due:CAL.addM(con,1),src:'입찰·계약',law:'공동주택관리법 제28조',how:'계약 체결일부터 1개월 이내, 개인정보는 가리고'});
+  }catch(e){}
+  try{var S2=eSched();S2.rows.forEach(function(r){if(r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)&&/notice|vote|result|cm$/.test(r.k))L.push({t:'선거: '+r.t,due:r.d,src:'선거',law:r.law,how:r.note});});}catch(e){}
+  return L;
+}
+function calCfg(){
+  var c=CQ(),o={};for(var k in c)o[k]=c[k];
+  o.units=state.complex.units;
+  try{o.ltmReview=LQ().meta.review||'';}catch(e){o.ltmReview='';}
+  o.links=calLinks();
+  return o;
+}
+function calList(from,to){var t=calToday(),sc=CQ().since||t;return CAL.build(calCfg(),from&&from>sc?from:sc,to||CAL.addM(t,12));}
+function calBuckets(){
+  var c=CQ(),t=calToday(),L=calList(),B={late:[],now:[],soon:[],need:[],later:[],done:[]};
+  L.forEach(function(x){var st=CAL.status(x,t,c.done);x.st=st;B[st].push(x);});
+  return B;
+}
+var CAL_ST={late:['지남','soon'],now:['이번 달','on'],soon:['30일 안','link'],later:['예정',''],done:['완료','on'],need:['날짜 필요','soon']};
+function calRow(x,full){
+  var st=CAL_ST[x.st]||['',''],dd=x.due?parseIso(x.due):null,left=x.due?Math.round((parseIso(x.due).t-parseIso(calToday()).t)/864e5):0;
+  var btn=x.st==='need'?'<button type="button" class="btn ghost sm" data-act="calset">최근 시행일 넣기</button>':x.st==='done'?'<button type="button" class="btn ghost sm" data-act="calundo" data-key="'+esc(x.key)+'">되돌리기</button>':x.kind==='link'?'<button type="button" class="btn ghost sm" data-go="'+({'관리규약':'rules','입찰·계약':'bid','선거':'elect'}[x.g]||'home')+'">열기</button> <button type="button" class="btn sm" data-act="caldone" data-key="'+esc(x.key)+'" data-id="'+x.id+'">완료</button>':'<button type="button" class="btn sm" data-act="caldone" data-key="'+esc(x.key)+'" data-id="'+x.id+'"'+(x.cu!=null?' data-cu="'+x.cu+'"':'')+'>완료</button>';
+  return '<li class="'+(x.st==='late'?'warn':x.st==='done'?'ok':'')+'" style="align-items:flex-start;gap:.6rem;flex-wrap:wrap"><b>'+(x.st==='late'?'!':x.st==='done'?'✓':x.st==='need'?'?':'·')+'</b>'+
+    '<span style="flex:1;min-width:12rem"><span style="display:inline-block;min-width:6.6rem;font-weight:700;color:var(--accent)">'+(dd?dd.y+'. '+dd.m+'. '+dd.d+'.':'—')+'</span> <b>'+esc(x.t)+'</b> <span class="tag '+st[1]+'">'+st[0]+(x.st==='late'?' '+(-left)+'일':x.st==='now'||x.st==='soon'?' D-'+left:'')+'</span>'+
+    (full?'<br><small class="muted">'+esc(x.g||'')+(x.law?' · '+esc(x.law):'')+'</small>'+(x.how?'<br><small>'+esc(x.how)+'</small>':''):'<br><small class="muted">'+esc(x.law||x.g||'')+'</small>')+'</span>'+
+    '<span class="row" style="gap:.3rem;flex:none;margin-left:auto">'+btn+'</span></li>';
+}
+function renderCal(v){
+  var c=CQ();
+  v.innerHTML='<h1 class="h-title">업무달력</h1><p class="lead">단지 조건과 최근 시행일을 넣으면 1년치 법정 업무의 기한을 계산합니다. 장기수선 정기검토, 관리규약 신고, 입찰·계약 공개, 선거 일정은 각 메뉴에 넣은 날짜를 그대로 가져옵니다.</p>'+
+    '<div class="pv-tabs" id="caltabs" role="group" aria-label="업무달력 보기">'+[['now','할 일'],['year','12개월'],['set','단지 조건·최근 시행일'],['law','근거 목록']].map(function(x){return '<button type="button" data-calv="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>'+
+    '<div id="calv"></div>';
+  calPaint();
+}
+function calPaint(){
+  var c=CQ(),v=c.ui.v||'now',box=$('#calv');if(!box)return;
+  $$('#caltabs button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.calv===v));});
+  if(v==='set'){box.innerHTML=calSetHtml();return;}
+  if(v==='law'){box.innerHTML='<section class="card"><h2>업무별 근거 <small>2026. 11. 법제처 현행본 기준</small></h2><ul class="chk">'+CAL.DEF.map(function(d){return '<li><b>·</b><span><b>'+esc(d.t)+'</b><br><small class="muted">'+esc(d.law)+'</small><br><small>'+esc(d.how)+'</small></span></li>';}).join('')+'</ul><p class="muted" style="margin-top:.6rem">소방시설 자체점검(별표 3)과 공동주택 소독 횟수(별표 7)는 법령 별표라 소방서·보건소 안내문으로 확인했습니다. 법령이 바뀌면 이 목록도 고쳐야 하니, 이상한 점이 보이면 알려 주세요.</p></section>';return;}
+  var B=calBuckets(),bar='<div class="row" style="margin:0 0 .8rem;flex-wrap:wrap"><button type="button" class="btn" data-act="calics">휴대폰 달력 파일(.ics) 받기</button><button type="button" class="btn ghost" data-act="calics" data-lite="1">매달 반복 업무 빼고 받기</button><button type="button" class="btn ghost" data-act="caldocx">연간 계획표 Word로 저장</button><button type="button" class="btn ghost" data-act="caldocx" data-hx="1">연간 계획표 한글로 저장</button></div>';
+  if(v==='year'){
+    var t=calToday(),L=calList(t.slice(0,8)+'01',CAL.addM(t,12)),m='',h='';
+    L.forEach(function(x){x.st=CAL.status(x,t,c.done);});
+    L.filter(function(x){return x.due;}).forEach(function(x){var k=x.due.slice(0,7);if(k!==m){if(m)h+='</ul>';m=k;h+='<h3 style="margin:1rem 0 .3rem">'+(+k.slice(0,4))+'년 '+(+k.slice(5,7))+'월</h3><ul class="chk">';}h+=calRow(x,false);});
+    if(m)h+='</ul>';
+    box.innerHTML=bar+'<p class="muted" style="margin:0 0 .4rem">이번 달부터 12개월. 지난 기한은 "할 일"에서 봅니다.</p>'+h;return;}
+  var cnt=function(a){return a.length;};
+  box.innerHTML=bar+
+    '<p style="margin:0 0 .6rem"><span class="tag soon">지난 기한 '+cnt(B.late)+'</span> <span class="tag on">이번 달 '+cnt(B.now)+'</span> <span class="tag link">30일 안 '+cnt(B.soon)+'</span>'+(B.need.length?' <span class="tag soon">날짜 필요 '+B.need.length+'</span>':'')+'</p>'+
+    (B.late.length?'<h3 style="margin:.6rem 0 .3rem">지난 기한 <small class="muted">이미 했으면 "완료"를 누르세요</small></h3><ul class="chk">'+B.late.map(function(x){return calRow(x,true);}).join('')+'</ul>':'')+
+    '<h3 style="margin:.8rem 0 .3rem">이번 달</h3>'+(B.now.length?'<ul class="chk">'+B.now.map(function(x){return calRow(x,true);}).join('')+'</ul>':'<p class="muted">이번 달 기한인 업무가 없습니다.</p>')+
+    (B.soon.length?'<h3 style="margin:.8rem 0 .3rem">30일 안</h3><ul class="chk">'+B.soon.map(function(x){return calRow(x,true);}).join('')+'</ul>':'')+
+    (B.need.length?'<h3 style="margin:.8rem 0 .3rem">최근 시행일이 있어야 계산되는 업무</h3><ul class="chk">'+B.need.map(function(x){return calRow(x,true);}).join('')+'</ul>':'')+
+    '<p class="muted" style="margin-top:.8rem">기한은 법령이 정한 "늦어도 이때까지"입니다. 단지 관리규약·계약서에 더 이른 날짜가 있으면 그 날짜를 따르세요.</p>';
+}
+function calSetHtml(){
+  var c=CQ(),h=c.have,L=c.last,ck=function(k,lab,hint){return '<label class="f" style="flex-direction:row;align-items:center;gap:.5rem"><input type="checkbox" data-bind="cal.have.'+k+'"'+(h[k]?' checked':'')+' style="width:auto"><span>'+lab+(hint?' <small class="muted">'+hint+'</small>':'')+'</span></label>';};
+  var mopt=function(sel){return '<option value="">고르세요</option>'+[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){return '<option value="'+m+'"'+(String(sel)===String(m)?' selected':'')+'>'+m+'월</option>';}).join('');};
+  var useM='';try{var u=LQ().meta.use;if(u)useM=String(+u.slice(5,7));}catch(e){}
+  return '<section class="card"><h2>단지 조건</h2><div class="grid2">'+
+      '<label class="f"><span>회계연도 시작 달</span><select data-bind="cal.fy">'+mopt(c.fy||'1').replace('<option value="">고르세요</option>','')+'</select><em>대부분 1월. 예산 승인·결산·회계감사 기한이 여기서 정해집니다.</em></label>'+
+      F('달력 시작일','cal.since',c.since,{type:'date',hint:'이 날보다 앞선 기한은 이미 처리한 것으로 보고 보여 주지 않습니다(승강기 등 "최근 시행일" 업무는 예외).'})+
+      '<label class="f"><span>세대수</span><input type="text" value="'+esc(state.complex.units||'')+'" disabled><em>홈의 단지 정보 값. 300세대 이상이면 소독 의무 대상입니다.</em></label>'+
+    '</div><div style="margin-top:.6rem">'+
+      ck('elev','승강기가 있습니다')+ck('play','어린이놀이시설이 있습니다')+ck('tank','저수조가 있습니다','(직결급수만이면 끄기)')+ck('septic','정화조가 있습니다','(공공하수처리구역이라 없으면 끄기)')+ck('fireFull','소방 종합점검 대상입니다','(스프링클러 설치 등 — 소방계획서로 확인)')+
+      ck('disinf','300세대 미만이지만 소독 일정을 넣습니다')+
+      '<label class="f" style="flex-direction:row;align-items:center;gap:.5rem"><input type="checkbox" data-bind="cal.auditSkip"'+(c.auditSkip?' checked':'')+' style="width:auto"><span>올해는 서면동의로 외부 회계감사를 생략합니다 <small class="muted">(법 제26조제1항 단서)</small></span></label>'+
+    '</div><div class="grid2" style="margin-top:.6rem">'+
+      '<label class="f"><span>소방 '+(h.fireFull?'종합':'작동')+'점검 달</span><select data-bind="cal.fireMonth">'+mopt(c.fireMonth)+'</select><em>소방계획서·점검계약서에 적힌 달.'+(useM?' 사용검사일 달은 '+useM+'월입니다.':'')+(h.fireFull?' 작동점검은 그 6개월 뒤 달로 잡습니다.':'')+'</em></label>'+
+      '<label class="f"><span>승강기 설치검사 연도</span><input type="text" data-bind="cal.elevYear" value="'+esc(c.elevYear||'')+'" placeholder="예: 1998"><em>설치검사 후 25년이 지나면 정기검사가 6개월마다입니다(교체 후 설치검사를 다시 받았으면 그 연도).</em></label>'+
+    '</div></section>'+
+    '<section class="card"><h2>최근 시행일 <small>주기가 "직전 시행일부터"인 업무</small></h2><div class="grid2">'+
+      F('승강기 직전 정기검사일','cal.last.elev',L.elev,{type:'date',hint:'승강기 검사 합격증의 검사일'})+
+      F('어린이놀이시설 직전 정기시설검사일','cal.last.play',L.play,{type:'date'})+
+      F('직전 수돗물 수질검사일','cal.last.water',L.water,{type:'date',hint:'다음 검사는 1년 뒤 그달 말일까지'})+
+      F('직전 정화조 청소일','cal.last.septic',L.septic,{type:'date'})+
+      F('직전 위험성평가(정기) 실시일','cal.last.risk',L.risk,{type:'date',hint:'위험성평가 메뉴의 상시평가를 매달 하면 정기평가로 봅니다.'})+
+    '</div></section>'+
+    '<section class="card"><h2>직접 추가 <small>전기 정기검사, 기계식주차장 검사, 보험 갱신 등</small></h2>'+
+      (c.custom.length?'<ul class="chk">'+c.custom.map(function(x,i){return '<li style="flex-wrap:wrap;gap:.4rem"><span style="flex:1;min-width:10rem" class="grid2">'+
+        '<label class="f"><span>업무 이름</span><input type="text" data-bind="cal.custom.'+i+'.name" value="'+esc(x.name||'')+'"></label>'+
+        '<label class="f"><span>주기 (개월)</span><input type="number" min="1" data-bind="cal.custom.'+i+'.cyc" value="'+esc(x.cyc||'')+'"></label>'+
+        '<label class="f"><span>최근 시행일</span><input type="date" data-bind="cal.custom.'+i+'.last" value="'+esc(x.last||'')+'"></label>'+
+        '<label class="f"><span>근거·메모</span><input type="text" data-bind="cal.custom.'+i+'.law" value="'+esc(x.law||'')+'" placeholder="예: 검사 결과서의 다음 검사일"></label></span>'+
+        '<button type="button" class="btn ghost sm" data-act="calcudel" data-i="'+i+'">빼기</button></li>';}).join('')+'</ul>':'<p class="muted">주기가 단지마다 다른 검사는 결과서의 다음 검사일을 보고 직접 넣으세요.</p>')+
+      '<div class="row" style="margin-top:.5rem"><button type="button" class="btn ghost sm" data-act="calcuadd">업무 추가</button></div></section>';
+}
+function calDocBlocks(){
+  var t=calToday(),c=CQ(),L=calList(t.slice(0,8)+'01',CAL.addM(t,12)).filter(function(x){return x.due;}),apt=state.complex.name;
+  var hd=function(s){return {t:s,b:1,f:'E7E6E6',al:'c',sz:18};},cc=function(s,al,sz){return {t:s,al:al||'l',sz:sz||17};};
+  var b=[P(apt+' 법정 업무 연간 계획표',{al:'center',b:1,sz:30,sp:[0,120,0]}),P(t.slice(0,4)+'. '+(+t.slice(5,7))+'.부터 12개월 · 작성 '+dDot(t),{al:'center',sz:19,co:'555555',sp:[0,200,0]})];
+  var rows=[{c:[hd('기한'),hd('업무'),hd('근거'),hd('확인')],hd:1,h:[420,'atLeast']}];
+  L.forEach(function(x){var d=parseIso(x.due);rows.push({c:[cc(d.y+'. '+d.m+'. '+d.d+'.','c'),cc(x.t),cc(x.law||x.g||'','l',15),cc(c.done[x.key]?'완료 '+c.done[x.key].slice(5).replace('-','.'):'□','c')]});});
+  b.push({k:'t',w:[1500,4300,2672,1100],c:1,rows:rows,split:1});
+  b.push(P('기한은 법령이 정한 마지막 날입니다. 관리규약·계약서에 더 이른 날짜가 있으면 그 날짜를 따릅니다.',{sz:17,co:'555555',sp:[160,0,0]}));
+  return b;
+}
+function calHomeCard(){
+  var c=CQ();if(!c.fireMonth&&!c.last.elev&&!hasData())return '';
+  var B=calBuckets(),list=B.late.concat(B.now).slice(0,6);
+  return '<section class="card"><h2>이번 달 법정 업무 <small>업무달력</small></h2>'+
+    '<p style="margin:0 0 .4rem"><span class="tag soon">지난 기한 '+B.late.length+'</span> <span class="tag on">이번 달 '+B.now.length+'</span> <span class="tag link">30일 안 '+B.soon.length+'</span></p>'+
+    (list.length?'<ul class="chk">'+list.map(function(x){return calRow(x,false);}).join('')+'</ul>':'<p class="muted">이번 달 기한인 업무가 없습니다.</p>')+
+    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-go="cal">업무달력 열기</button></div></section>';
+}
+function calAct(act,a){
+  var c=CQ();
+  if(act==='caldone'){var k=a.dataset.key,id=a.dataset.id,t=calToday();
+    if(a.dataset.cu!=null){var x=c.custom[+a.dataset.cu];if(x)x.last=t;}
+    else if(/^(elev|play|water|septic|risk)$/.test(id))c.last[id]=t;
+    else c.done[k]=t;
+    saveNow();calRefresh();toast('완료로 표시했습니다('+t+').'+(c.last[id]===t?' 다음 기한을 오늘부터 다시 계산했습니다.':''));return true;}
+  if(act==='calundo'){delete c.done[a.dataset.key];saveNow();calRefresh();return true;}
+  if(act==='calset'){c.ui.v='set';saveNow();calPaint();return true;}
+  if(act==='calcuadd'){c.custom.push({name:'',cyc:'',last:'',law:''});saveNow();calPaint();return true;}
+  if(act==='calcudel'){c.custom.splice(+a.dataset.i,1);saveNow();calPaint();return true;}
+  if(act==='calics'){var t2=calToday(),L=calList(t2,CAL.addM(t2,12)).filter(function(x){return x.due&&!c.done[x.key]&&(!a.dataset.lite||!/^(tankM|disclose)$/.test(x.id));});
+    if(!L.length){toast('넣을 일정이 없습니다.');return true;}
+    saveFile('법정업무달력_'+state.complex.name+'.ics',new Blob([CAL.ics(L,state.complex.name)],{type:'text/calendar'}));return true;}
+  if(act==='caldocx'){makeDocx(calDocBlocks(),{footer:1,margins:[1134,1134,1134,1134]}).then(function(bl){return saveFile('법정업무_연간계획표_'+state.complex.name+'.docx',bl);}).catch(function(){toast('문서를 만들지 못했습니다.');});return true;}
+  return false;
+}
+function calRefresh(){if(tab==='cal')calPaint();else if(tab==='home'){var y=window.scrollY;go('home',true);window.scrollTo(0,y);}}
+
+
 /* ═════════ 장기수선 ═════════ */
 function ltmDefault(){return {
   meta:{use:'',review:'',area:'',units:'',bal:'',balDate:'',rates:[{from:'',to:'',u:''}],intr:'',esc:'',priceY:'',done:false,end:'',types:[{a:'',n:''}],one:'',yr:''},
@@ -4301,7 +4684,7 @@ function renderLongterm(v){
   '</div><div class="row" style="margin-top:.6rem;align-items:center"><button type="button" class="btn sm" data-act="ltkfund">K-apt에서 충당금 잔액 가져오기</button><span class="muted" id="lt-kfmsg" style="font-size:.85rem">단지코드만 있으면 공개된 최근 잔액과 기준월을 바로 넣습니다.</span></div><p class="muted" id="lt-rev" style="margin:.6rem 0 0"></p></section>'+
   '<ol class="lt-steps" id="ltsteps" aria-label="장기수선 단계">'+LT_S.map(function(x,i){return '<li><button type="button" data-ltv="'+x[1][0]+'" data-lts="'+i+'"><b>'+(i+1)+'</b><span>'+x[0]+'</span></button></li>';}).join('')+'</ol>'+
   '<div class="pv-tabs" id="lttabs" role="group" aria-label="이 단계의 화면">'+LT_V.map(function(x){return '<button type="button" data-ltv="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>'+
-  '<div id="ltv"></div><input type="file" id="ltfile" accept=".xlsx,.csv,.txt,.json,.pdf,text/csv,application/json,application/pdf" hidden>';
+  '<div id="ltv"></div><input type="file" id="ltfile" accept=".xlsx,.hwp,.hwpx,.pdf,.csv,.txt,.json,text/csv,application/json,application/pdf" hidden>';
   var f=$('#ltfile');if(f)f.addEventListener('change',ltImport);
   ltRev();ltPaint();
 }
@@ -4341,8 +4724,8 @@ function ltItemsView(box){
   var L=LQ(),ys=ltYears(),fy=L.ui.fy;
   if(fy===''&&ys.length){var cy=new Date().getFullYear();fy=String(ys.filter(function(y){return y>=cy;})[0]||ys[0]);L.ui.fy=fy;}
   box.innerHTML='<section class="card"><h2>계획 항목 <small>연도별 수선예정현황</small></h2>'+
-    '<div class="row"><button type="button" class="btn" data-act="ltload">파일 불러오기 (엑셀·PDF·CSV·JSON)</button><button type="button" class="btn ghost" data-act="ltxlsx">엑셀로 내보내기</button><button type="button" class="btn ghost" data-act="ltjson">단지 자료 저장(JSON)</button><button type="button" class="btn ghost sm" data-act="lttpl">빈 양식(엑셀) 받기</button><button type="button" class="btn ghost sm" data-act="ltcsv">CSV로 내보내기</button></div>'+
-    '<p class="muted" id="ltmsg" style="margin:.5rem 0 0">글자가 있는 PDF 계획서는 그대로 불러와 "연도별 수선예정현황" 표를 읽어 봅니다(금액 합계를 원본과 맞춰 보세요). 글자가 없는 스캔 PDF이거나 표를 못 읽으면, 빈 양식(엑셀)을 받아 그 표를 연도·수선방법·수선율·공사종별·구분·위치·규격·수량·단위·금액 순으로 옮겨 적고, 엑셀 파일 그대로 불러오면 됩니다. 단지 자료 파일은 이 컴퓨터에만 보관하세요.</p>'+
+    '<div class="row"><button type="button" class="btn" data-act="ltload">파일 불러오기 (엑셀·한글·PDF·CSV·JSON)</button><button type="button" class="btn ghost" data-act="ltxlsx">엑셀로 내보내기</button><button type="button" class="btn ghost" data-act="ltjson">단지 자료 저장(JSON)</button><button type="button" class="btn ghost sm" data-act="lttpl">빈 양식(엑셀) 받기</button><button type="button" class="btn ghost sm" data-act="ltcsv">CSV로 내보내기</button></div>'+
+    '<p class="muted" id="ltmsg" style="margin:.5rem 0 0">한글(.hwp·.hwpx)·글자가 있는 PDF 계획서는 그대로 불러와 "연도별 수선예정현황" 표를 읽어 봅니다(금액 합계를 원본과 맞춰 보세요). 글자가 없는 스캔 PDF이거나 표를 못 읽으면, 빈 양식(엑셀)을 받아 그 표를 연도·수선방법·수선율·공사종별·구분·위치·규격·수량·단위·금액 순으로 옮겨 적고, 엑셀 파일 그대로 불러오면 됩니다. 단지 자료 파일은 이 컴퓨터에만 보관하세요.</p>'+
     (L.items.length?'':'<p class="note" style="margin-top:.8rem">아직 항목이 없습니다. 빈 양식을 받아 채우거나, 아래 "항목 추가"로 직접 넣을 수 있습니다.</p>')+
   '</section>'+
   '<section class="card"><h2>연도별 합계 <small id="lt-tot"></small></h2><div id="lt-ysum"></div>'+
@@ -4809,6 +5192,16 @@ function ltEstKapt(){
 /* ── 엑셀 파일 ── */
 var ltPdfLast=null;
 function ltReadFile(f,done){
+  var YRE=/^(연도|년도|수선연도|예정연도|수선예정연도|시행연도)$/;
+  if(/\.(hwp|hwpx)$/i.test(f.name)){var isX=/x$/i.test(f.name),nm=f.name.replace(/\.hwpx?$/i,'');toast('한글 파일의 표를 읽는 중입니다…');
+    f.arrayBuffer().then(function(buf){
+      if(isX){if(typeof JSZip==='undefined')throw new Error('jszip');return JSZip.loadAsync(buf).then(hwpxTables);}
+      return hwpRead(buf).then(function(r){return r.tables;});})
+    .then(function(tables){
+      if(!tables.length){toast('이 한글 파일에서 표를 찾지 못했습니다. 계획표가 그림으로 붙어 있으면 빈 양식(엑셀)에 옮겨 적어 주세요.');return;}
+      var tb=pickTable(tables,YRE,/금액/),all=tb||[].concat.apply([],tables);
+      ltPdfLast={rows:all,name:nm};done(all,null,{pdf:1,kind:'한글 파일'});})
+    .catch(function(e){var m=String(e&&e.message||e);toast(/암호/.test(m)?'암호가 걸린 한글 파일은 읽지 못합니다.':/배포용/.test(m)?'배포용 한글 파일은 읽지 못합니다. 원본을 넣어 주세요.':'한글 파일을 읽지 못했습니다. 한글에서 표를 엑셀로 복사해 빈 양식에 붙여 넣어 주세요.');});return;}
   if(/\.pdf$/i.test(f.name)){toast('PDF의 표를 읽는 중입니다…');f.arrayBuffer().then(pdfRows).then(function(r){
       if(r.chars<50){toast('이 PDF는 글자가 없는 그림(스캔) 파일입니다. 빈 양식(엑셀)에 옮겨 적어 넣어 주세요.');return;}
       var tb=pdfTable(r.xr,/^(연도|년도|수선연도|예정연도|수선예정연도)$/,/금액/,/^(연도|년도|수선연도|예정연도|수선예정연도)$/)||r.rows;ltPdfLast={rows:tb,name:f.name.replace(/\.pdf$/i,'')};done(tb,null,{pdf:1});})
@@ -5173,11 +5566,11 @@ function ltImport(e){
         saveNow();go('longterm',true);ltMsg('단지 자료를 불러왔습니다: 항목 '+state.ltm.items.length+'건. <button type="button" class="btn ghost sm" data-act="ltundo">되돌리기</button>');return;}
       var r=rows?LT.itemsFromRows(rows):LT.itemsFromCSV(t);
       if(!r.err&&info&&info.pdf&&r.items.filter(function(x){return x.a>0;}).length<r.items.length*0.6)r.err='금액 칸을 제대로 읽지 못했습니다.';
-      if(r.err&&info&&info.pdf){ltUndo=null;if(!$('#ltmsg')){L.ui.v='items';saveNow();ltPaint();}ltMsg('PDF에서 글자 '+rows.length+'줄을 읽었지만 계획표의 칸(연도·공사종별·금액)을 제대로 나누지 못했습니다. 읽은 내용을 엑셀로 받아 빈 양식 순서로 정리한 뒤 다시 불러오세요. <button type="button" class="btn sm" data-act="ltpdfx">읽은 표 엑셀로 받기</button>');return;}
+      if(r.err&&info&&info.pdf){ltUndo=null;if(!$('#ltmsg')){L.ui.v='items';saveNow();ltPaint();}ltMsg((info.kind||'PDF')+'에서 '+rows.length+'줄을 읽었지만 계획표의 칸(연도·공사종별·금액)을 제대로 나누지 못했습니다. 읽은 내용을 엑셀로 받아 빈 양식 순서로 정리한 뒤 다시 불러오세요. <button type="button" class="btn sm" data-act="ltpdfx">읽은 표 엑셀로 받기</button>');return;}
       if(r.err){var hr=LT.histFromRows(rows||LT.parseCSV(t));if(!hr.err&&L.items.length){ltUndo=null;L.ui.v='field';saveNow();ltPaint();ltHistRows(hr);return;}toast(r.err+(hr.err?'':' (유지관리이력 파일은 계획 항목을 먼저 불러온 뒤 넣으세요.)'));return;}
       L.items=r.items;L.base=JSON.parse(JSON.stringify(r.items));L.baseAt=ltToday();L.why={};L.use.ids=[];L.ui.fy='';
       var ys=ltYears();if(!L.meta.end&&ys.length)L.meta.end=String(ys[ys.length-1]);
-      saveNow();ltPaint();ltMsg((info&&info.pdf?'PDF':rows?'엑셀':'CSV')+'에서 '+r.items.length+'건을 불러와 현행 계획 기준으로 잡았습니다.'+(info&&info.pdf?' PDF는 칸이 어긋날 수 있으니 금액 합계를 원본과 꼭 맞춰 보세요.':'')+' <button type="button" class="btn ghost sm" data-act="ltundo">되돌리기</button>');
+      saveNow();ltPaint();ltMsg((info&&info.pdf?(info.kind||'PDF'):rows?'엑셀':'CSV')+'에서 '+r.items.length+'건을 불러와 현행 계획 기준으로 잡았습니다.'+(info&&info.pdf?' 표 모양에 따라 칸이 어긋날 수 있으니 금액 합계를 원본과 꼭 맞춰 보세요.':'')+' <button type="button" class="btn ghost sm" data-act="ltundo">되돌리기</button>');
     }catch(x){toast('읽을 수 없는 파일입니다. 엑셀·CSV 또는 이 화면에서 저장한 JSON인지 확인하세요.');}
   });
 }
@@ -5238,6 +5631,7 @@ function onInput(e){
   if(tab==='bid'&&/^bids\.\d+\./.test(b)){var bk=b.replace(/^bids\.\d+\./,'');if(/^cos\./.test(bk)){scCells();return;}if(bk==='kind'){var bq=BQ(),kk=BD.kind(bq.kind);bq.award='';bq.eval=evalDefault(bq.kind);bq.sui=(bq.sui||[]).filter(function(n){return !BD.suiFit(+n,kk,0)||+n===6;});}
     if(/^(kind|path|amtMode|site|type|award|pt\.on)$/.test(bk)){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);}else{refreshBid();}return;}
   if(tab==='longterm'&&b.indexOf('ltm.')===0){ltInput(b,el);return;}
+  if(tab==='cal'&&b.indexOf('cal.')===0){if(el.type==='checkbox'||el.tagName==='SELECT')calPaint();return;}
   if(b.indexOf('complex.')===0)updateChip();
   if(b==='risk.url'){paintRisk();riskSum=null;paintRiskSum();}
   if(b==='risk.key'){riskSum=null;clearTimeout(window._rkT);window._rkT=setTimeout(function(){paintRiskSum(true);},600);}
@@ -5262,6 +5656,7 @@ function onClick(e){
   var lv=e.target.closest('#lttabs button[data-ltv],#ltsteps button[data-ltv]');if(lv){LQ().ui.v=lv.dataset.ltv;save();ltPaint();return;}
   var lv2=e.target.closest('[data-ltv2]');if(lv2){LQ().ui.v=lv2.dataset.ltv2;save();ltPaint();var tb=$('#lttabs');if(tb)tb.scrollIntoView({behavior:'smooth',block:'start'});return;}
   var ld=e.target.closest('#ltdtabs button[data-ltd]');if(ld){LQ().ui.doc=ld.dataset.ltd;save();ltDocPaint();return;}
+  var cv=e.target.closest('#caltabs button[data-calv]');if(cv){CQ().ui.v=cv.dataset.calv;save();calPaint();return;}
   var dr=e.target.closest('#rltabs button[data-rdoc]');if(dr){R().ui.doc=dr.dataset.rdoc;save();refreshRules();return;}
   var dt=e.target.closest('#pvtabs button[data-doc]');if(dt){state.ui.doc=dt.dataset.doc;save();refreshPreview();return;}
   var a=e.target.closest('[data-act]');if(!a)return;
@@ -5271,6 +5666,7 @@ function onClick(e){
   if(act.indexOf('el')===0&&elAct(act,a))return;
   if(act.indexOf('rk')===0&&rkAct(act))return;
   if(act.indexOf('lt')===0&&ltAct(act,a))return;
+  if(act.indexOf('cal')===0&&calAct(act,a))return;
   if(act==='addag'){state.agendas.push({title:'',result:'가결',discuss:'',resolution:''});save();renderAgList();refreshPreview();var inp=$$('#aglist .ag-h input');if(inp.length)inp[inp.length-1].focus();}
   else if(act==='agdel'){state.agendas.splice(i,1);save();renderAgList();refreshPreview();}
   else if(act==='agup'&&i>0){var t=state.agendas[i];state.agendas[i]=state.agendas[i-1];state.agendas[i-1]=t;save();renderAgList();refreshPreview();}
