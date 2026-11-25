@@ -126,6 +126,18 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .pv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.3rem .8rem;font-size:.85rem;cursor:pointer;color:var(--ink2)}
 .pv-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
 .lt-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:1.1rem 0 .55rem;padding:0;list-style:none}
+.sd-what{margin:.5rem 0 .3rem;line-height:1.7;color:var(--ink)}
+.sd-sec{border-top:1px solid var(--line);padding:.35rem 0}
+.sd-sec>summary{cursor:pointer;font-weight:700;color:var(--ink);padding:.25rem 0;font-size:.95rem}
+.sd-sec>div{padding:.2rem 0 .4rem}
+.sd-sub{margin:.5rem 0 .2rem;font-weight:700;font-size:.86rem;color:var(--ink)}
+.sd-list{margin:0;padding-left:1.1rem;display:grid;gap:.25rem;font-size:.88rem;color:var(--ink2);line-height:1.6}
+.sd-cite{display:inline-block;font-size:.72rem;color:var(--muted);border:1px solid var(--line);border-radius:.3rem;padding:0 .3rem;margin-left:.2rem}
+.sd-types td{font-size:.84rem;vertical-align:top}
+.sd-types tr.ours td{background:var(--accent-soft)}
+@media (max-width:640px){.sd-types thead{display:none}.sd-types,.sd-types tbody,.sd-types tr,.sd-types td{display:block;width:100%}.sd-types tr{border:1px solid var(--line);border-radius:.5rem;margin:0 0 .5rem;padding:.3rem .5rem}.sd-types td{border:0;padding:.15rem 0}.sd-types td[data-l]::before{content:attr(data-l) ': ';font-weight:700;color:var(--ink)}}
+.sd-head{margin:.6rem 0 .2rem;padding:.5rem .7rem;border-radius:.5rem;background:var(--surface);border:1px solid var(--line)}
+.sd-head p{margin:.2rem 0;font-size:.88rem}
 .s3l{position:absolute;left:0;top:0;white-space:nowrap;font-size:.74rem;font-weight:600;color:#1B2530;background:rgba(255,255,255,.82);border-radius:.3rem;padding:0 .3rem;line-height:1.45;margin-top:-4px;will-change:transform}
 .s3l.s3m{opacity:.55;font-weight:500}
 .s3l.s3b{background:none;color:#46515E;font-size:.82rem;text-shadow:0 0 3px #fff,0 0 3px #fff}
@@ -1817,6 +1829,7 @@ var SYS = (function () {
       '[규칙]',
       '1. 도면에 보이는 것만 적습니다. 추측한 값은 넣지 말고, 애매하면 note에 "확인 필요"라고 씁니다.',
       '2. 각 설비에 어느 도면에서 읽었는지 sheet(예: "M-03 장비일람표")를 적습니다.',
+      '2-1. spec에는 장비일람표 글자를 그대로 옮깁니다: 형식(다단 볼류트·웨스코·입형·자흡식·FRP·콘크리트·유입식 등), 단수, 유량(LPM), 양정(m), 마력(HP), 구경(mm), 전원(3상 380V), 용량(톤·L·kVA). 항목 사이는 " · "로 나눕니다.',
       '3. 흐름 방향대로 links를 잇습니다(물이 흐르는 방향, 전기가 가는 방향, 신호가 가는 방향).',
       '4. k(종류)는 다음 중 하나: src(인입·수원) tank(수조·탱크) pump(펌프) valve(밸브·장치) pipe(배관·구간) use(세대·사용처) panel(수신기·반) tr(변압기·수전) gen(발전기·축전지) dev(기타)',
       '5. 계통(sys.id)은 water(급수) fire(소화) alarm(소방 경보) elec(전기)를 기본으로, 있으면 drain(배수) gas(가스) heat(난방·급탕)도 넣습니다.',
@@ -1839,13 +1852,278 @@ var SYS = (function () {
 })();
 
 
+/* 설비 사전 — 어느 단지에나 같은 설명(무엇인지·방식별 특징·점검·수명·고장 대처).
+   법 근거는 법령 조회로 확인한 조문만 적는다. 법이 아닌 것은 '실무 권장'으로 따로 둔다. */
+var SD = (function () {
+  var C = {
+    b1: '공동주택관리법 시행규칙 별표1',
+    su1: '수도법 시행규칙 제22조의4제1항', su3: '수도법 시행규칙 제22조의4제3항', su4: '수도법 시행규칙 제22조의4제4항·제5항', su6: '수도법 시행규칙 제22조의4제6항',
+    fi: '소방시설법 제22조(자체점검)', nf: '옥내소화전설비의 화재안전기술기준(NFTC 102)',
+    el: '전기안전관리법 제11조·시행규칙 제8조(정기검사)', elw: '전기안전관리법 시행규칙 별표1(공사계획 신고)'
+  };
+  var D = [
+    { id: 'ftank', t: '옥상 소화용 수조', m: /옥상.{0,8}소화|소화\s*용?\s*수조/, k: ['tank'],
+      what: '옥상에 따로 둔 소화용 물입니다. 지하 소화펌프가 멈춰도 높이 차로 위층 소화전에 물을 보낼 수 있게 합니다.',
+      types: null,
+      law: [['지하 수원과 별도로 유효수량의 3분의 1 이상을 옥상에 둠(예외 있음)', C.nf + ' 2.1.2'],
+        ['동결 방지, 수조 밖 수위계, 청소용 배수밸브, "옥내소화전소화설비용 수조" 표지', C.nf + ' 2.1.6']],
+      prac: ['겨울 전 보온·동파 확인', '수위가 늘 차 있는지 순찰 때 확인'],
+      life: [], lifeNote: '별표1에 소화용 수조 항목은 따로 없습니다.',
+      faults: [['수위가 낮음', '보급수 밸브·볼탭 고장'], ['겨울에 얼음', '보온재·히팅케이블 손상']], tips: [] },
+    { id: 'roof', t: '옥상 물탱크 (고가수조)', m: /고가\s*수조|옥상.{0,6}(물탱크|수조)/, k: ['tank'],
+      what: '옥상에 올려 둔 물탱크입니다. 지하에서 펌프로 올린 물을 모아 두었다가, 높이 차(중력)로 각 세대에 내려보냅니다. 펌프가 잠깐 멈춰도 탱크에 남은 물로 한동안 물이 나옵니다.',
+      types: { h: '재질별 특징', rows: [
+        { n: 'FRP (유리섬유 강화 플라스틱)', k: /FRP|합성수지/i, d: '판을 볼트로 조립한 각형이 많습니다. 가볍고 녹이 슬지 않습니다.', pro: '값이 싸고 가볍다', con: '오래되면 판이 얇아지고 빛이 스며 이끼가 낄 수 있다. 볼트 이음부 누수' },
+        { n: 'STS (스테인리스)', k: /STS|스테인/i, d: '스테인리스 판을 용접·조립합니다.', pro: '위생적이고 오래 간다', con: '값이 비싸다. 용접부 부식 점검 필요' },
+        { n: 'SMC (판넬)', k: /SMC/i, d: '압축 성형한 합성수지 판넬 조립식입니다.', pro: '빛이 덜 스며 이끼가 적다', con: '판넬 이음 실링 노후 시 누수' }
+      ] },
+      law: [['반기 1회 이상 청소, 월 1회 이상 위생상태 점검 (옥상 물탱크도 수돗물을 담는 저수조로 관리)', C.su1],
+        ['청소 후 물을 채우고 잔류염소 0.1~4.0mg/L, pH 5.8~8.5, 탁도 0.5NTU 이하인지 확인', C.su3],
+        ['매년 1회 이상 지정 수질검사기관에 수질검사 (탁도·pH·잔류염소·일반세균·총대장균군·대장균 등)', C.su4],
+        ['수질검사 결과를 게시판 등으로 입주민에게 알림', C.su6]],
+      prac: ['맨홀 뚜껑 잠금과 환기구·월류관 방충망 확인', '겨울 전 보온재·히팅케이블 확인(동파)', '만수·감수 경보가 관리실까지 오는지 시험'],
+      life: [['저수조(STS, 합성수지)', '전면교체']], lifeNote: '별표1에는 "고가수조"라는 이름 대신 "저수조(STS, 합성수지)"로 들어 있습니다.',
+      faults: [['물이 넘쳐 월류관으로 흐름', '정수위밸브·볼탭이 안 닫힘 → 밸브 점검·교체'], ['물이 부족하다는 경보', '양수펌프 정지, 수위 전극봉(레벨 스위치) 고장 확인'], ['물에 이끼·냄새', '빛 스밈·청소 주기 확인, 맨홀 틈새 막기'], ['탱크 이음부 물샘', '볼트·실링 재조임 또는 판 교체']],
+      tips: ['평형별로 탱크를 나눠 쓰는 단지는 탱크 하나를 청소할 때 그 라인만 단수됩니다. 청소 공지를 라인별로 내면 민원이 줄어듭니다.'] },
+    { id: 'tank', t: '지하 저수조', m: /저수조|물탱크|수조/, k: ['tank'],
+      what: '수돗물을 처음 받아 모아 두는 큰 물통입니다. 여기서 펌프가 물을 퍼 올립니다. 소화용 물과 같이 쓰는 단지가 많습니다.',
+      types: { h: '재질·구조별 특징', rows: [
+        { n: '콘크리트 (건물과 한 몸)', k: /콘크리트|RC/i, d: '건물 바닥·벽을 그대로 수조로 씁니다. 오래된 단지에 많습니다.', pro: '크게 만들 수 있고 튼튼하다', con: '균열·방수층 노후 시 누수, 내부 도장 보수 필요. 통째 교체가 어렵다' },
+        { n: 'FRP·SMC (합성수지 조립식)', k: /FRP|SMC|합성수지/i, d: '판을 조립해 바닥 위에 세웁니다.', pro: '설치·교체가 쉽다', con: '판 이음부 누수, 노후 시 강도 저하' },
+        { n: 'STS (스테인리스 조립식)', k: /STS|스테인/i, d: '스테인리스 판 조립식입니다.', pro: '위생적이고 오래 간다', con: '값이 비싸다' }
+      ] },
+      law: [['반기 1회 이상 청소, 월 1회 이상 위생상태 점검', C.su1],
+        ['청소 후 잔류염소 0.1~4.0mg/L, pH 5.8~8.5, 탁도 0.5NTU 이하 확인', C.su3],
+        ['매년 1회 이상 지정 수질검사기관에 수질검사', C.su4],
+        ['수질검사 결과를 입주민에게 알림', C.su6],
+        ['소화용과 같이 쓰는 수조는 소화펌프 흡입구를 다른 설비 흡입구보다 낮게 두어, 그 사이 물을 소화용으로 남김', C.nf + ' 2.1.4·2.1.5']],
+      prac: ['정수위밸브 앞 스트레이너(거름망) 청소', '수위계·감수 경보 시험', '청소할 때 한 칸씩 비워 단수를 막음(2칸 이상일 때)'],
+      life: [['저수조(STS, 합성수지)', '전면교체']], lifeNote: '콘크리트 저수조는 별표1에 교체 항목이 없습니다. 방수·도장 보수를 따로 계획하세요.',
+      faults: [['물이 줄지 않는데 펌프가 계속 돎', '세대·배관 누수 의심 → 시간대별 수위 기록'], ['청소 뒤 녹물·냄새', '배관 퇴수(물 빼기)와 잔류염소 재확인'], ['바닥에 물이 고임', '수조 벽 균열·배관 관통부 누수 확인']],
+      tips: ['급수 흡입구가 소화 흡입구보다 높으면, 물을 다 써도 소화용 물은 남습니다. 청소 뒤 흡입구 높이가 바뀌지 않았는지 확인하세요.'] },
+    { id: 'boost', t: '급수 가압펌프', m: /가압\s*펌프/, k: ['pump'],
+      what: '꼭대기 층과 바로 아래층은 옥상 탱크와 높이 차가 작아 수압이 약합니다. 이 층들에 압력을 보태 주는 작은 펌프입니다.',
+      types: null, law: [],
+      prac: ['압력 스위치 설정값 기록', '여름철 모터 과열·소음 확인', '최상층 수압 민원이 오면 먼저 이 펌프 운전 상태 확인'],
+      life: [['급수펌프', '전면교체']],
+      faults: [['최상층만 물이 약함', '가압펌프 정지·압력 스위치 불량'], ['펌프가 계속 켜졌다 꺼짐', '압력탱크 공기 부족·체크밸브 불량']],
+      tips: [] },
+    { id: 'lift', t: '양수펌프 (급수펌프)', m: /양수\s*펌프|급수\s*펌프|부스터/, k: ['pump'],
+      what: '저수조의 물을 옥상 물탱크(또는 세대)까지 밀어 올리는 펌프입니다. 전기 모터가 날개바퀴(임펠러)를 돌려 물에 압력을 줍니다.',
+      types: { h: '급수 방식별 특징', sc: 'sys', rows: [
+        { n: '고가수조식', k: /고가\s*수조|옥상.{0,4}(물탱크|수조)/, d: '펌프가 옥상 탱크로 올리고, 세대에는 중력으로 내려보냅니다.', pro: '정전·펌프 고장 때도 탱크에 남은 물만큼 나온다. 수압이 일정하다', con: '꼭대기 층은 수압이 약하다(가압펌프 필요). 옥상 탱크 청소·위생 관리 부담' },
+        { n: '부스터(가압) 방식', k: /부스터|인버터/, d: '옥상 탱크 없이 펌프가 배관 압력을 직접 유지합니다. 인버터로 회전수를 바꿉니다.', pro: '옥상 탱크가 없어 위생 관리가 쉽다. 전기 절약', con: '정전·고장 시 곧바로 단수. 압력 설정·제어반 관리 필요' },
+        { n: '수도 직결식', k: /직결/, d: '수돗물 압력으로 바로 공급합니다(저층 위주).', pro: '수조가 없어 가장 위생적', con: '수도 압력에 따라 수압이 달라진다. 고층은 어렵다' }
+      ] },
+      law: [], lawNote: '급수펌프만 따로 정한 법정 점검 주기는 이 사전에 없습니다. 아래 실무 관리를 권합니다.',
+      prac: ['예비기가 있으면 1~2주마다 번갈아 운전(한 대만 계속 돌면 다른 한 대가 굳음)', '소음·진동·베어링 온도, 메커니컬실(축 물막이) 물샘 확인', '토출 압력계 값을 기록해 두고 평소와 비교', '모터 절연저항은 전기안전관리자 점검 때 같이 확인'],
+      life: [['급수펌프', '전면교체']],
+      faults: [['펌프가 돌아도 물이 안 올라감', '흡입 쪽 공기 고임·풋밸브(바닥 밸브) 불량·저수조 수위 저하'], ['자주 섰다 돌았다 함', '수위 전극봉 오작동, 배관 누수'], ['축 쪽에서 물이 샘', '메커니컬실 마모 → 교체'], ['심한 소음·진동', '베어링 마모, 방진 스프링·고무 노후, 임펠러 이물질']],
+      tips: ['예비기가 없는 펌프는 고장 나면 그 동이 바로 단수됩니다. 예비 부품(메커니컬실·베어링)을 갖추거나 긴급 수리 업체를 정해 두세요.'] },
+    { id: 'fls', t: '정수위조절밸브 · 볼탭', m: /정수위|볼탭|볼탑/, k: ['valve'],
+      what: '수조에 물이 차면 자동으로 닫히고, 물이 줄면 열려 수돗물을 받는 밸브입니다. 변기 물통의 뜨개와 같은 역할을 큰 규모로 합니다.',
+      types: { h: '방식별 특징', rows: [
+        { n: '정수위조절밸브 (파일럿식)', k: /정수위/, d: '작은 볼탭·전극이 신호를 주면 큰 밸브가 물 압력으로 여닫힙니다.', pro: '큰 관경에 쓰고, 천천히 닫혀 수격(쿵 소리)이 적다', con: '파일럿 관이 막히면 안 닫혀 넘친다' },
+        { n: '볼탭', k: /볼탭|볼탑/, d: '뜨개(볼)가 직접 밸브를 누릅니다.', pro: '단순하고 싸다', con: '큰 수조에는 맞지 않고 마모가 빠르다' }
+      ] }, law: [],
+      prac: ['앞쪽 스트레이너(거름망) 정기 청소', '만수 때 확실히 닫히는지 월류관 확인'],
+      life: [], lifeNote: '별표1에 따로 항목이 없어 보통 수선유지비로 고칩니다.',
+      faults: [['수조가 넘침', '파일럿 관 막힘·다이어프램 손상'], ['물이 안 들어옴', '스트레이너 막힘·인입 밸브 닫힘']], tips: [] },
+    { id: 'jockey', t: '충압펌프', m: /충압/, k: ['pump'],
+      what: '평소 배관에서 조금씩 새는 압력을 채워 주는 작은 펌프입니다. 이 펌프 덕분에 큰 주펌프가 쓸데없이 켜지지 않습니다.',
+      types: null,
+      law: [['압력챔버를 쓰면 충압펌프를 둠. 토출압력은 가장 높은 호스 접결구의 자연압보다 0.2MPa 이상 크거나 주펌프 정격압력과 같게', C.nf + ' 2.2.1.13']],
+      prac: ['하루에 몇 번 켜지는지 기록 — 갑자기 늘면 배관 누수 신호'],
+      life: [['소화펌프', '전면교체']],
+      faults: [['너무 자주 켜짐', '소화 배관·밸브 누수, 압력탱크 공기 부족'], ['계속 안 꺼짐', '압력 스위치 설정 오류, 큰 누수']], tips: [] },
+    { id: 'fpump', t: '소화펌프 (주펌프)', m: /소화전\s*주펌프|주펌프|스프링클러\s*펌프|소화\s*펌프/, k: ['pump'],
+      what: '불이 나서 소화전을 열거나 스프링클러 헤드가 터지면 배관 압력이 떨어지고, 그 신호로 자동으로 돌기 시작해 물을 보내는 펌프입니다.',
+      types: { h: '기동 방식', rows: [
+        { n: '압력챔버 (기동용 수압개폐장치)', k: /압력\s*(탱크|챔버)|수압개폐/, sc: 'sys', d: '배관에 붙은 탱크의 압력 스위치가 압력이 떨어지면 펌프를 켭니다.', pro: '가장 흔하고 단순하다', con: '탱크 공기가 빠지면 펌프가 자주 켜진다' },
+        { n: '기동용 압력스위치', k: /압력\s*스위치/, d: '탱크 없이 압력 스위치만 답니다.', pro: '설치 공간이 작다', con: '설정값 관리가 중요하다' }
+      ] },
+      law: [['정기적으로 작동점검·종합점검(자체점검)을 하고 결과를 보고', C.fi],
+        ['성능: 밸브를 닫고 돌릴 때(체절운전) 정격 압력의 140%를 넘지 않고, 정격 유량의 150%에서 정격 압력의 65% 이상. 이를 시험하는 성능시험배관 설치', C.nf + ' 2.2.1.7'],
+        ['한 번 기동하면 자동으로 멈추지 않아야 함(충압펌프 제외)', C.nf + ' 2.2.1.16'],
+        ['임펠러는 청동·스테인리스 등 부식에 강한 재질, 펌프축은 스테인리스 등', C.nf + ' 2.2.1.17']],
+      lawNote: '화재안전기술기준은 건축허가·착공 당시 기준을 따르는 것이 원칙입니다(NFTC 102 1.5.1).',
+      prac: ['점검·공사 뒤 동력제어반·감시제어반이 "자동" 위치로 돌아왔는지 꼭 확인', '분기 1회 정도 성능시험배관으로 유량·압력 확인 기록', '흡입 쪽 개폐밸브가 열려 있는지(개폐표시형) 확인'],
+      life: [['소화펌프', '전면교체']],
+      faults: [['화재 때 펌프가 안 돎', '제어반이 수동·정지 위치로 남아 있음(가장 흔함), 압력 스위치 불량'], ['펌프가 돌다가 물 온도가 오름', '순환배관·릴리프밸브 막힘'], ['성능시험에서 압력 부족', '임펠러 마모·흡입 막힘']],
+      tips: ['소방 점검 업체가 점검 중에 펌프를 "수동"으로 돌려 놓고 그대로 가는 일이 있습니다. 점검 끝나는 날 관리사무소가 직접 자동 복귀를 확인하세요.'] },
+    { id: 'ptank', t: '압력탱크 (압력챔버)', m: /압력\s*(탱크|챔버)/, k: ['valve', 'tank'],
+      what: '소화 배관에 붙은 작은 탱크입니다. 안의 공기가 쿠션 역할을 하고, 압력 스위치가 압력 변화를 읽어 펌프를 켜고 끕니다.',
+      types: null,
+      law: [['압력챔버를 쓰면 용적 100L 이상', C.nf + ' 2.2.1.11']],
+      prac: ['정기적으로 물을 빼고 공기를 다시 채움(점검 업체와 함께)', '압력 스위치 설정값(켜짐·꺼짐)을 표로 붙여 두기'],
+      life: [], lifeNote: '별표1에 따로 항목이 없습니다.',
+      faults: [['펌프가 짧게 자주 켜짐', '탱크 안 공기 빠짐 → 배수 후 공기 재충전']], tips: [] },
+    { id: 'alarm', t: '알람밸브 (유수검지장치)', m: /알람\s*밸브|유수검지/, k: ['valve'],
+      what: '스프링클러 헤드가 터져 물이 흐르기 시작하면 이를 감지해 경보를 울리고 펌프를 기동시키는 밸브입니다. 층이나 구역마다 하나씩 있습니다.',
+      types: { h: '방식별 특징', rows: [
+        { n: '습식 (알람밸브)', k: /알람/, d: '배관 끝 헤드까지 늘 물이 차 있습니다.', pro: '가장 빠르고 단순하다', con: '얼 수 있는 곳에는 못 쓴다' },
+        { n: '건식', k: /건식/, d: '밸브 뒤 배관에 압축 공기를 채웁니다.', pro: '동파 걱정이 없다', con: '방수가 조금 늦고 공기 압축기 관리 필요' },
+        { n: '준비작동식', k: /준비작동|프리액션/, d: '감지기가 먼저 불을 감지해야 밸브가 열립니다.', pro: '헤드 파손만으로는 물이 안 나와 물 피해가 적다', con: '감지기·제어반 연동 관리가 복잡' }
+      ] },
+      law: [['정기 자체점검(작동·종합) 대상', C.fi]],
+      prac: ['압력계 1차·2차 값이 같은지 확인', '시험 밸브로 배수해 경보·펌프 기동 확인(점검 때)'],
+      life: [], lifeNote: '별표1에는 헤드·소화수관·소화펌프만 있고 알람밸브는 따로 없습니다.',
+      faults: [['물이 안 나왔는데 경보가 울림', '배관 압력 출렁임(수격) → 리타딩 챔버·배수 확인'], ['배수구로 물이 계속 샘', '밸브 시트에 이물질']], tips: [] },
+    { id: 'head', t: '스프링클러 헤드', m: /헤드|스프링클러(?!\s*펌프)/, k: ['use', 'dev'],
+      what: '천장에 달린 꼭지입니다. 불이 나 온도가 오르면 유리구슬이 깨지며 열려 물을 뿌립니다. 불난 곳의 헤드만 열립니다.',
+      types: null,
+      law: [['정기 자체점검(작동·종합) 대상', C.fi]],
+      prac: ['세대 인테리어·도색으로 헤드를 가리거나 칠하지 않게 안내', '지하주차장 헤드 파손(차량 충돌) 확인'],
+      life: [['스프링클러 헤드', '전면교체']],
+      faults: [['헤드에서 물이 떨어짐', '헤드 파손·동파 → 해당 알람밸브 구역 차단 후 교체'], ['페인트가 묻은 헤드', '작동 온도가 바뀔 수 있어 교체']], tips: [] },
+    { id: 'hyd', t: '옥내소화전 · 방수기구함', m: /소화전|방수기구/, k: ['use', 'dev'],
+      what: '복도·계단에 있는 소화전함입니다. 호스를 펴고 밸브를 열면 소화펌프가 자동으로 돌아 물이 나옵니다.',
+      types: null,
+      law: [['층마다, 각 부분에서 방수구까지 수평거리 25m 이하. 방수구 높이 바닥에서 1.5m 이하. 호스 구경 40mm 이상', C.nf + ' 2.4.2'],
+        ['노즐 끝 방수압 0.17MPa 이상, 방수량 130L/min 이상. 0.7MPa를 넘으면 감압장치', C.nf + ' 2.2.1.3'],
+        ['함 위에 위치표시등, 근처에 펌프 기동 표시등(적색)', C.nf + ' 2.4.3']],
+      prac: ['함 앞 자전거·짐 적치 금지 안내', '호스 꼬임·노즐 분실·표시등 꺼짐 순찰'],
+      life: [['소화수관(강관)', '전면교체']],
+      faults: [['표시등이 꺼짐', '램프·배선 불량'], ['밸브가 안 돌아감', '오래 안 써서 고착 → 점검 때 조작']], tips: [] },
+    { id: 'siam', t: '송수구', m: /송수구/, k: ['src', 'dev'],
+      what: '건물 밖에 있는 소방차 연결구입니다. 소방차가 여기에 호스를 꽂아 건물 안 소화 배관에 물을 밀어 넣습니다.',
+      types: null,
+      law: [['지면에서 0.5~1m 높이, 구경 65mm 쌍구형·단구형, 이물질 막는 마개, 근처에 자동배수밸브·체크밸브', C.nf + ' 2.3.12'],
+        ['"송수구" 표지와 송수압력 범위 표지 (2026. 7. 1. 개정 기준)', C.nf + ' 2.3.12.7']],
+      prac: ['주변 주차·화단·적치물로 가리지 않게 관리', '마개 분실 확인'],
+      life: [], faults: [['마개가 없음', '이물질이 들어가 막힐 수 있어 바로 보충']], tips: [] },
+    { id: 'recv', t: '화재 수신기 (수신반)', m: /수신기|수신반/, k: ['panel'],
+      what: '감지기·발신기 신호를 모아 어디서 불이 났는지 보여 주고 경보를 울리는 장치입니다. 소화펌프·제연팬 같은 설비도 여기서 같이 움직입니다.',
+      types: { h: '방식별 특징', rows: [
+        { n: 'P형', k: /P형|P-?1/i, d: '경계구역(회로)마다 전선을 한 가닥씩 끌어옵니다.', pro: '구조가 단순하다', con: '어느 세대인지가 아니라 "구역"만 안다. 선이 많아 단선·누전 찾기가 어렵다' },
+        { n: 'R형', k: /R형/i, d: '중계기가 신호를 통신으로 보냅니다.', pro: '위치를 자세히 알고 선이 적다', con: '중계기·통신 고장 관리 필요, 값이 비싸다' }
+      ] },
+      law: [['정기 자체점검(작동·종합) 대상', C.fi]],
+      prac: ['매일 교대 때 전원·예비전원 표시등, 고장 표시 확인', '경보를 끈 뒤 "복구"와 연동 스위치 정상 위치 확인 — 연동 정지 상태로 두지 않기', '비화재보가 잦은 회로는 기록해 감지기 교체 계획'],
+      life: [['수신반', '전면교체']],
+      faults: [['비화재보(불이 안 났는데 울림)', '감지기 먼지·습기·노후, 욕실 수증기'], ['예비전원 이상', '수신기 안 축전지 수명'], ['회로 단선 표시', '감지기 탈거·배선 손상']],
+      tips: ['수신반을 옮기거나 경비실을 고칠 때 소방 공사 신고 대상인지 먼저 확인하세요.'] },
+    { id: 'det', t: '감지기 · 발신기', m: /감지기|발신기/, k: ['dev', 'use'],
+      what: '연기나 열을 느끼면 수신기에 신호를 보내는 장치(감지기)와, 사람이 눌러 알리는 버튼(발신기)입니다.',
+      types: { h: '감지기 종류', rows: [
+        { n: '차동식 (열 오름 속도)', d: '온도가 빨리 오르면 작동. 거실·방에 흔합니다.', pro: '값이 싸다', con: '천천히 타는 불은 늦다' },
+        { n: '정온식 (정해진 온도)', d: '정해진 온도를 넘으면 작동. 주방·보일러실 등 평소 더운 곳.', pro: '열기에 덜 오작동', con: '반응이 늦다' },
+        { n: '연기식 (광전식)', d: '연기가 들어오면 작동. 계단·복도·엘리베이터 기계실.', pro: '빨리 감지', con: '먼지·벌레·수증기에 오작동' }
+      ] },
+      law: [['정기 자체점검(작동·종합) 대상', C.fi]],
+      prac: ['비화재보가 난 감지기는 위치·날짜를 기록해 같은 자리 반복 여부 확인'],
+      life: [['감지기', '전면교체']],
+      faults: [['욕실 앞에서 자주 울림', '수증기 — 정온식으로 바꾸는 방안 검토(소방 업체 협의)'], ['감지기 떼어 놓음', '세대 인테리어 때 탈거 — 복구 안내']], tips: [] },
+    { id: 'smoke', t: '제연 급기팬', m: /급기\s*팬|제연/, k: ['dev'],
+      what: '불이 나면 계단 앞 전실에 바깥 공기를 불어 넣어, 연기가 계단으로 못 들어오게 막는 큰 송풍기입니다.',
+      types: null, law: [['정기 자체점검(작동·종합) 대상', C.fi]],
+      prac: ['점검 때 실제 기동·풍량과 전실 댐퍼 동작 확인', '팬실 문 잠금과 적치물 확인'],
+      life: [], lifeNote: '별표1 환기설비의 "환기팬"은 일반 환풍기 항목이라 제연팬과는 다릅니다.',
+      faults: [['기동은 되는데 바람이 약함', '벨트·댐퍼·필터 확인'], ['자동 기동 안 됨', '수신기 연동 정지 상태']], tips: [] },
+    { id: 'hv', t: '수전반 (특고압 수전설비)', m: /수전반|수전|특고압|VCB|LBS/, k: ['panel', 'src'],
+      what: '한전에서 들어오는 22.9kV(22,900V) 전기를 받아 들이는 첫 관문입니다. 개폐기·피뢰기·퓨즈·계량기·차단기가 한 줄로 들어 있습니다.',
+      parts: [['LDS·LBS (개폐기)', '전기를 넣고 끊는 스위치'], ['LA (피뢰기)', '번개 같은 이상 전압을 땅으로 흘림'], ['PF (전력 퓨즈)', '큰 고장 전류에 녹아 끊김'], ['MOF (계기용 변성기)', '한전 전력량계가 읽을 수 있게 전압·전류를 줄임'], ['VCB (진공차단기)', '이상 시 자동으로 끊는 주 차단기']],
+      types: null,
+      law: [['자가용전기설비는 정기검사를 받아야 함 — 대상·시기는 시행규칙 별표4(전기안전공사 안내문으로 확인)', C.el],
+        ['수전용 차단기·변압기 등을 바꾸는 공사는 공사계획 신고 대상이 될 수 있음', C.elw]],
+      prac: ['전기안전관리자 점검 기록 확인', '전기실 결로·쥐·누수 막기, 문 잠금'],
+      life: [['수전반', '전면교체'], ['배전반', '전면교체']],
+      faults: [['단지 전체 정전', '한전 정전인지, 우리 차단기(VCB) 트립인지 먼저 구분'], ['차단기 투입이 안 됨', '조작용 축전지(정류기반) 전압 저하']], tips: [] },
+    { id: 'tr', t: '변압기', m: /변압기|TR\s?\d/i, k: ['tr'],
+      what: '22.9kV 높은 전압을 우리가 쓰는 380V·220V로 낮추는 장치입니다. 용량(kVA)이 클수록 동시에 쓸 수 있는 전기가 많습니다.',
+      types: { h: '형식별 특징', rows: [
+        { n: '유입식 (기름에 담금)', k: /유입/, d: '절연유로 열을 식힙니다. 오래된 단지에 많습니다.', pro: '튼튼하고 싸다', con: '누유·화재 위험, 절연유 열화 관리' },
+        { n: '몰드식', k: /몰드/, d: '코일을 에폭시 수지로 감쌉니다.', pro: '불에 강하고 관리가 쉽다', con: '소음, 값이 비싸다' },
+        { n: '아몰퍼스·고효율', k: /아몰퍼스|고효율/, d: '철심 손실을 줄인 고효율 변압기입니다.', pro: '대기 전력 손실이 적어 전기요금 절감', con: '값이 비싸다' }
+      ] },
+      law: [['자가용전기설비 정기검사 대상', C.el]],
+      prac: ['여름 피크 때 온도·소음 확인, 최대 부하율 기록', '유입식은 누유·절연유 시험 결과 확인'],
+      life: [['변압기', '전면교체']],
+      faults: [['여름에 온도 경보', '과부하·냉각 불량 → 부하 분산 검토'], ['바닥에 기름 자국', '패킹 노후 누유']], tips: ['교체할 때 고효율 변압기로 바꾸면 한전·지자체 지원 사업이 있는지 확인해 보세요.'] },
+    { id: 'gen', t: '비상발전기', m: /발전기/, k: ['gen'],
+      what: '정전되면 자동으로 시동이 걸려 소방펌프·승강기·비상조명 같은 꼭 필요한 곳에 전기를 대는 엔진 발전기입니다.',
+      types: null,
+      law: [['자가용전기설비 정기검사 대상', C.el],
+        ['비상용 예비발전설비를 새로 설치·교체할 때는 공사계획 신고 대상', C.elw],
+        ['옥내소화전 비상전원은 20분 이상 작동할 수 있어야 함', C.nf + ' 2.5.3.2']],
+      prac: ['월 1회 정도 무부하 시운전 기록(실무 권장)', '연료량·냉각수·시동용 축전지 전압 확인', '정전 대비 실제 부하를 걸어 보는 시험은 계획을 세워 연 1회 이상 권장'],
+      life: [['발전기', '부분수선'], ['발전기', '전면교체']],
+      faults: [['시동이 안 걸림', '시동용 축전지 방전·연료 공급 불량'], ['돌다가 꺼짐', '냉각수 부족·과열, 연료 필터 막힘']], tips: [] },
+    { id: 'ats', t: '자동절환스위치 (ATS)', m: /ATS|절환/i, k: ['valve', 'panel'],
+      what: '정전되면 한전 전기를 끊고 발전기 전기로 바꿔 주고, 전기가 돌아오면 다시 한전으로 돌려주는 스위치입니다.',
+      types: null, law: [['자가용전기설비 정기검사 때 함께 확인', C.el]],
+      prac: ['발전기 시운전 때 실제 전환까지 해 보는 시험(관리자 입회)'],
+      life: [['배전반', '전면교체']], lifeNote: '별표1에 ATS만의 항목은 없어 배전반으로 계획하는 단지가 많습니다.',
+      faults: [['발전기는 도는데 전기가 안 감', 'ATS 전환 불량·수동 위치']], tips: [] },
+    { id: 'batt', t: '축전지 · 정류기반', m: /축전지|배터리|정류기/, k: ['gen'],
+      what: '차단기를 넣고 끊는 데 쓰는 직류(DC) 전원입니다. 정전 때도 차단기를 조작할 수 있게 해 줍니다.',
+      types: null, law: [],
+      prac: ['전압·누액·부풀음 확인', '교체 주기는 제품 설명서 기준(실무에서는 수년 단위)'],
+      life: [], lifeNote: '별표1에 따로 항목이 없어 보통 수선유지비로 교체합니다.',
+      faults: [['정전 뒤 차단기를 다시 못 넣음', '축전지 전압 저하']], tips: [] },
+    { id: 'lv', t: '저압반 · 분전반', m: /저압반|분전반|배전반|동력반|MCC/i, k: ['panel'],
+      what: '변압기에서 나온 전기를 동·설비별로 나눠 보내는 차단기 묶음입니다.',
+      types: null, law: [['자가용전기설비 정기검사 대상에 포함', C.el]],
+      prac: ['열화상 카메라로 차단기 발열 점검(여름)', '차단기마다 어디로 가는지 이름표'],
+      life: [['배전반', '전면교체']],
+      faults: [['특정 차단기가 자주 떨어짐', '과부하·누전 → 그 회로 부하 확인']], tips: [] },
+    { id: 'sump', t: '배수펌프 · 집수정', m: /배수\s*펌프|집수정/, k: ['pump', 'tank'],
+      what: '지하로 스며든 물·빗물을 모으는 웅덩이(집수정)와, 물이 차면 자동으로 밖으로 퍼내는 펌프입니다.',
+      types: { h: '형식별 특징', rows: [
+        { n: '수중펌프', k: /수중/, d: '펌프 통째로 물속에 넣습니다.', pro: '소음이 적고 설치가 쉽다', con: '꺼내야 점검할 수 있다' },
+        { n: '입형 (모터가 위)', k: /입형/, d: '모터는 위에, 축이 집수정 안으로 내려갑니다.', pro: '모터가 물에 안 잠겨 점검이 쉽다', con: '축·베어링 관리 필요' },
+        { n: '자흡식', k: /자흡/, d: '스스로 물을 빨아올리는 펌프로 집수정 밖에 둡니다.', pro: '물에 안 잠긴다', con: '흡입 높이 제한, 마중물이 빠지면 공회전' }
+      ] },
+      law: [],
+      prac: ['장마 전 플로트(뜨개) 스위치로 자동 기동 시험', '2대가 짝이면 번갈아 운전', '집수정 바닥 흙·쓰레기 청소', '만수 경보가 관리실까지 오는지 시험'],
+      life: [['펌프', '전면교체']], lifeNote: '별표1 배수설비 "펌프" 항목입니다.',
+      faults: [['물이 찼는데 안 돎', '플로트가 걸림·모터 소손·차단기 떨어짐'], ['계속 돎', '플로트 고장, 지하수 유입 증가']],
+      tips: ['폭우 때 정전과 겹치면 배수펌프가 멈춥니다. 비상발전기 부하에 들어 있는지 확인하세요.'] }
+  ];
+  function txt(n) { return [n.t, n.ltm].join(' '); }
+  function find(n) {
+    var t = txt(n), i, e;
+    for (i = 0; i < D.length; i++) { e = D[i]; if (e.m.test(t) && (!e.k || e.k.indexOf(n.k) >= 0)) return e; }
+    if (n.k === 'dev' || n.k === 'use') return null;
+    for (i = 0; i < D.length; i++) { e = D[i]; if (e.m.test(String(n.t))) return e; }
+    return null;
+  }
+  function num(s) { s = String(s).replace(/,/g, ''); var m = s.match(/^(\d+)\/(\d+)$/); return m ? +m[1] / +m[2] : parseFloat(s); }
+  function fmt(n, d) { return (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString('ko-KR'); }
+  /* 제원 숫자를 쉬운 말로 */
+  function spec(sp) {
+    var s = String(sp || ''), out = [], m;
+    if ((m = s.match(/([\d,.]+)\s*LPM/i))) { var q = num(m[1]); out.push([m[0], '1분에 물 ' + fmt(q) + '리터, 1시간이면 약 ' + fmt(q * 60 / 1000, 1) + '톤']); }
+    if ((m = s.match(/(?:^|[\s·(])([\d.]+)\s*m(?![m²³a-z])/i))) { var h = num(m[1]); out.push([m[1] + 'm (양정)', '물을 약 ' + fmt(h) + 'm 높이까지 밀어 올리는 힘 — 아파트 층 높이 2.8m로 치면 약 ' + fmt(h / 2.8) + '층, 압력으로 약 ' + fmt(h / 100, 2) + 'MPa(' + fmt(h / 10, 1) + 'kgf/㎠)']); }
+    if ((m = s.match(/([\d/.]+)\s*HP/i))) { var hp = num(m[1]); out.push([m[0], '모터 힘 약 ' + fmt(hp * 0.746, 1) + 'kW — 1시간 돌리면 전기 약 ' + fmt(hp * 0.746, 1) + 'kWh']); }
+    if ((m = s.match(/(\d+)\s*단/))) out.push([m[0], '날개바퀴(임펠러) ' + m[1] + '개를 겹쳐 압력을 높이는 다단 펌프']);
+    if ((m = s.match(/구경\s*(\d+)\s*mm/))) out.push([m[0], '펌프에 연결되는 배관 지름 ' + m[1] + 'mm']);
+    if (/3상\s*380/.test(s)) out.push(['3상 380V', '동력용 전기 — 동력반(MCC)에서 공급']);
+    else if (/단상\s*220/.test(s)) out.push(['단상 220V', '가정용과 같은 전기']);
+    if ((m = s.match(/([\d.]+)\s*톤/)) && !/LPM/i.test(s)) out.push([m[0], fmt(num(m[1]) * 1000) + '리터']);
+    if ((m = s.match(/([\d,]+)\s*L(?![A-Za-z])/)) && !/LPM/i.test(s)) out.push([m[0], fmt(num(m[1]) / 1000, 1) + '톤']);
+    if ((m = s.match(/([\d,]+)\s*kVA/i))) { var kv = num(m[1]); out.push([m[0], '동시에 쓸 수 있는 전기의 크기 — 대략 ' + fmt(kv * 0.8) + '~' + fmt(kv * 0.9) + 'kW 부하까지(역률 0.8~0.9로 볼 때)']); }
+    if ((m = s.match(/([\d.]+)\s*kV(?!A)/i))) out.push([m[0], fmt(num(m[1]) * 1000) + 'V 특고압']);
+    if ((m = s.match(/([\d,]+)\s*CMM/i))) out.push([m[0], '1분에 공기 ' + fmt(num(m[1])) + '㎥를 보냄']);
+    if ((m = s.match(/([\d,]+)\s*mmAq/i))) out.push([m[0], '바람을 밀어내는 힘(정압) ' + m[1] + 'mm 물기둥 높이']);
+    if ((m = s.match(/(\d+)\s*AH/i))) out.push([m[0], '축전지 용량 — 1A로 약 ' + m[1] + '시간 쓸 수 있는 양']);
+    return out;
+  }
+  function lifeRows(e) {
+    var B = (typeof LT !== 'undefined' && LT.B1) ? LT.B1 : [];
+    return (e.life || []).map(function (l) { var r = B.filter(function (b) { return b.n === l[0] && b.m === l[1]; })[0]; return r ? { n: r.n, m: r.m, c: r.c, r: r.r, note: r.note } : null; }).filter(Boolean);
+  }
+  return { D: D, C: C, find: find, spec: spec, num: num, lifeRows: lifeRows };
+})();
+
+
 (function(){
 'use strict';
 
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.18.0';
+var APP_VER='1.19.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5068,14 +5346,57 @@ function sysPaint(){
     '</section>';
   if(!q.ui.edit&&vw==='3d')sys3dStart(d,s,q.ui.sel,hits,function(id){q.ui.sel=id;save();var n=s.nodes.filter(function(x){return x.id===id;})[0],dt=$('#sys-detail');if(dt&&n){dt.innerHTML=sysDetail(n);}});
 }
+/* 높이로 본 양정 여유(대략) — 펌프 아래쪽으로 이어진 동의 층수로 계산 */
+function sysHead(n,e){
+  if(!e||!/^(lift|fpump|boost)$/.test(e.id))return '';
+  var m=String(n.spec||'').match(/(?:^|[\s·(])([\d.]+)\s*m(?![m²³a-z])/i);if(!m)return '';
+  var head=parseFloat(m[1]),q=SQ(),d=q.data,s=sysCur();if(!d||!s)return '';
+  var B=SYS.bldgs(d),byT={};B.forEach(function(b){byT[b.t]=b;});
+  var out={};s.links.forEach(function(l){(out[l.a]=out[l.a]||[]).push(l.b);});
+  var seen={},stack=[n.id],best=null,nd={};s.nodes.forEach(function(x){nd[x.id]=x;});
+  while(stack.length){var id=stack.pop();if(seen[id])continue;seen[id]=1;(out[id]||[]).forEach(function(b){var x=nd[b];if(!x)return;var w=SYS.where(x,B),bs=w.bd==='*'?B:(byT[w.bd]?[byT[w.bd]]:[]);bs.forEach(function(bb){if(!best||bb.fl>best.b.fl)best={b:bb,roof:w.f[0]==='R',x:x};});stack.push(b);});}
+  if(!best)return '';
+  var pw=SYS.where(n,B),below=pw.f[0]==='B'||!pw.bd?3:0,fl=best.b.fl,need,how,FHm=2.8;
+  if(e.id==='fpump'){need=below+(fl-1)*FHm+1.5+17;how='지하 펌프실에서 '+esc(best.b.t)+' '+fl+'층 소화전(바닥 위 1.5m)까지 약 '+Math.round(need-17)+'m + 노즐 방수압 17m(0.17MPa, NFTC 102 2.2.1.3)';}
+  else if(e.id==='boost'){return '';}
+  else{need=below+fl*FHm+(best.roof?3:0);how=(below?'지하 펌프실에서 ':'')+esc(best.b.t)+(best.roof?' 옥상 물탱크':' '+fl+'층')+'까지 높이 약 '+Math.round(need)+'m';}
+  var r=head/need,v=r>=1.15?['여유 있는 편','#1f8a70']:r>=1?['빠듯한 편 — 배관 저항까지 따져 볼 필요','#a16207']:['부족할 수 있음 — 전문가 확인 권장','#b91c1c'];
+  return '<div class="sd-head"><b>높이로 본 힘 (대략)</b><p>'+how+' → 필요 약 <b>'+Math.round(need)+'m</b>, 이 펌프 양정 <b>'+head+'m</b> · <span style="color:'+v[1]+';font-weight:700">'+v[0]+'</span></p><small class="muted">층 높이 2.8m로 가정한 계산입니다. 배관 마찰손실은 빼지 않았으니 참고만 하세요.</small></div>';
+}
 function sysDetail(n){
-  var k=SYS.KIND[n.k]||SYS.KIND.dev,L=sysLtm(n),row=function(a,b){return b?'<tr><th style="width:7rem;text-align:left">'+a+'</th><td>'+esc(b)+'</td></tr>':'';};
-  return '<div class="note" style="border-left:5px solid '+k[1]+'"><b style="font-size:1.05rem">'+esc(n.t)+'</b> <span class="tag">'+k[0]+'</span>'+
-    '<table class="kt" style="margin-top:.5rem"><tbody>'+row('규격',n.spec)+row('수량',n.qty)+row('위치',n.loc+(n.bd||n.fl?' ('+[n.bd==='*'?'각 동':n.bd,n.fl].filter(Boolean).join(' · ')+')':''))+row('도면',n.sheet)+row('메모',n.note)+row('평소 점검',n.check)+'</tbody></table>'+
-    (sysKw(n).length?'<p style="margin:.6rem 0 .2rem"><b>장기수선계획</b> <small class="muted">찾은 낱말: '+esc(sysKw(n).join(', '))+'</small></p>'+
-      (L.length?'<ul class="chk">'+L.slice(0,8).map(function(x){return '<li><b>·</b><span><b>'+esc(x.y)+'년</b> '+esc(x.n)+' <span class="muted">'+esc([x.m==='부분'?'부분 '+x.p+'%':'전면',x.g,x.loc].filter(Boolean).join(' · '))+'</span> '+LT.won(x.a)+'원</span></li>';}).join('')+'</ul>'+(L.length>8?'<p class="muted">외 '+(L.length-8)+'건</p>':'')
-        :'<p class="muted" style="margin:0">장기수선 메뉴에 계획 항목을 넣으면 여기에 함께 나옵니다.</p>'):'')+
-    '</div>';
+  var k=SYS.KIND[n.k]||SYS.KIND.dev,L=sysLtm(n),e=SD.find(n),row=function(a,b){return b?'<tr><th style="width:6.5rem;text-align:left">'+a+'</th><td>'+esc(b)+'</td></tr>':'';};
+  var sec=function(t,body,open){return body?'<details class="sd-sec"'+(open?' open':'')+'><summary>'+t+'</summary><div>'+body+'</div></details>':'';};
+  var sp=SD.spec(n.spec),q=SQ(),s=sysCur(),ctx=[n.t,n.spec,n.note].join(' '),sctx=(s?s.nodes.map(function(x){return x.t+' '+x.spec;}).join(' '):'');
+  var h='<div class="note sd" style="border-left:5px solid '+k[1]+'"><div class="row" style="justify-content:space-between;align-items:baseline"><div><b style="font-size:1.08rem">'+esc(n.t)+'</b> <span class="tag">'+k[0]+'</span></div>'+(e?'<small class="muted">설비 사전: '+esc(e.t)+'</small>':'<small class="muted">설비 사전에 아직 없는 설비</small>')+'</div>';
+  if(e)h+='<p class="sd-what">'+esc(e.what)+'</p>';
+  /* 우리 단지 제원 */
+  var spec='<table class="kt"><tbody>'+row('규격',n.spec)+row('수량',n.qty)+row('위치',n.loc+(n.bd||n.fl?' ('+[n.bd==='*'?'각 동':n.bd,n.fl].filter(Boolean).join(' · ')+')':''))+row('도면',n.sheet)+row('메모',n.note)+'</tbody></table>';
+  if(sp.length)spec+='<p class="sd-sub">숫자 풀이</p><ul class="sd-list">'+sp.map(function(x){return '<li><b>'+esc(x[0])+'</b> — '+esc(x[1])+'</li>';}).join('')+'</ul>';
+  spec+=sysHead(n,e);
+  if(e&&e.parts)spec+='<p class="sd-sub">안에 든 부품</p><ul class="sd-list">'+e.parts.map(function(x){return '<li><b>'+esc(x[0])+'</b> — '+esc(x[1])+'</li>';}).join('')+'</ul>';
+  h+=sec('우리 단지 제원',spec,true);
+  if(e&&e.types){
+    var hit=-1;e.types.rows.forEach(function(r,i){if(hit<0&&r.k&&r.k.test((e.types.sc||r.sc)==='sys'?sctx:ctx))hit=i;});
+    h+=sec(e.types.h,'<div style="overflow-x:auto"><table class="kt sd-types"><thead><tr><th>방식</th><th>특징</th><th>좋은 점</th><th>아쉬운 점</th></tr></thead><tbody>'+e.types.rows.map(function(r,i){return '<tr'+(i===hit?' class="ours"':'')+'><td><b>'+esc(r.n)+'</b>'+(i===hit?' <span class="tag">우리 단지</span>':'')+'</td><td>'+esc(r.d)+'</td><td data-l="좋은 점">'+esc(r.pro)+'</td><td data-l="아쉬운 점">'+esc(r.con)+'</td></tr>';}).join('')+'</tbody></table></div>'+(hit<0?'<p class="muted" style="margin:.3rem 0 0;font-size:.82rem">우리 단지가 어느 방식인지 규격 글에서 찾지 못했습니다. "고치기"에서 규격에 방식 이름을 적으면 표시됩니다.</p>':''),true);
+  }
+  /* 점검 */
+  var ck='';
+  if(e&&e.law.length)ck+='<p class="sd-sub">법에 정해진 것</p><ul class="sd-list">'+e.law.map(function(x){return '<li>'+esc(x[0])+' <span class="sd-cite">'+esc(x[1])+'</span></li>';}).join('')+'</ul>';
+  if(e&&e.lawNote)ck+='<p class="muted" style="font-size:.82rem;margin:.2rem 0">'+esc(e.lawNote)+'</p>';
+  if(e&&e.prac.length)ck+='<p class="sd-sub">실무 권장</p><ul class="sd-list">'+e.prac.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>';
+  if(n.check)ck+='<p class="sd-sub">우리 단지 메모</p><p style="margin:0">'+esc(n.check)+'</p>';
+  h+=sec('점검',ck,true);
+  /* 수명·교체 */
+  var lf='',LR=e?SD.lifeRows(e):[];
+  if(LR.length)lf+='<ul class="sd-list">'+LR.map(function(r){return '<li><b>'+esc(r.n)+'</b> '+esc(r.m)+' — 수선주기 <b>'+r.c+'년</b>, 수선율 '+r.r+'%'+(r.note?' <span class="muted">('+esc(r.note)+')</span>':'')+'</li>';}).join('')+'</ul><p class="sd-cite" style="margin:.1rem 0 .3rem">'+esc(SD.C.b1)+(typeof LT!=='undefined'&&LT.B1_VER?' · '+esc(LT.B1_VER.replace(/^.*\(/,'(')):'')+'</p>';
+  if(e&&e.lifeNote)lf+='<p class="muted" style="font-size:.85rem;margin:.2rem 0">'+esc(e.lifeNote)+'</p>';
+  if(sysKw(n).length)lf+='<p class="sd-sub">우리 장기수선계획 <small class="muted">찾은 낱말: '+esc(sysKw(n).join(', '))+'</small></p>'+
+    (L.length?'<ul class="sd-list">'+L.slice(0,8).map(function(x){return '<li><b>'+esc(x.y)+'년</b> '+esc(x.n)+' <span class="muted">'+esc([x.m==='부분'?'부분 '+x.p+'%':'전면',x.g,x.loc].filter(Boolean).join(' · '))+'</span> '+LT.won(x.a)+'원</li>';}).join('')+'</ul>'+(L.length>8?'<p class="muted">외 '+(L.length-8)+'건</p>':'')
+      :'<p class="muted" style="margin:0">장기수선 메뉴에 계획 항목을 넣으면 여기에 함께 나옵니다.</p>');
+  h+=sec('수명·교체',lf,!e||L.length>0);
+  if(e&&e.faults.length)h+=sec('자주 생기는 고장과 대처','<div style="overflow-x:auto"><table class="kt"><thead><tr><th>이럴 때</th><th>먼저 볼 곳</th></tr></thead><tbody>'+e.faults.map(function(f){return '<tr><td>'+esc(f[0])+'</td><td>'+esc(f[1])+'</td></tr>';}).join('')+'</tbody></table></div>',false);
+  if(e&&e.tips.length)h+=sec('알아 두면 좋은 점','<ul class="sd-list">'+e.tips.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>',false);
+  return h+'<p class="muted" style="font-size:.78rem;margin:.6rem 0 0">법 근거는 조문을 확인해 적었고, "실무 권장"은 법이 아닌 관리 요령입니다. 우리 단지 상황에 맞는지 위탁사·점검 업체와 함께 확인하세요.</p></div>';
 }
 function sysEditHtml(s){
   var ko=Object.keys(SYS.KIND).map(function(k){return [k,SYS.KIND[k][0]];});
