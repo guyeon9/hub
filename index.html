@@ -2143,7 +2143,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.21.0';
+var APP_VER='1.21.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5465,8 +5465,10 @@ function setupFind(){
   box.innerHTML='<p class="muted" style="margin:0">'+esc(state.complex.region)+' 단지 목록에서 찾는 중… (처음엔 10초쯤)</p>';
   fetch(kapiBase()+'/api/find?sido='+sd+'&q='+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'찾지 못했습니다');
+    var part=j.done===false?'<p class="note" style="margin:0 0 .4rem">'+esc(state.complex.region)+' 단지 '+(j.of||0).toLocaleString('ko-KR')+'곳까지 읽었습니다. 단지가 많은 곳이라 아직 다 못 읽었으니 <b>"단지 찾기"를 한 번 더 눌러 주세요.</b> <button type="button" class="btn sm" data-act="hmfind">한 번 더 찾기</button></p>':'';
+    if(!j.list.length&&part){box.innerHTML=part;return;}
     if(!j.list.length){box.innerHTML='<p class="note" style="margin:0">"'+esc(q)+'"(으)로 찾은 단지가 없습니다. 이름을 짧게 줄이거나(예: "행복마을아파트" → "행복") 동 이름으로 찾아보세요.</p>';return;}
-    box.innerHTML='<ul class="chk">'+j.list.map(function(r){return '<li style="align-items:center;gap:.6rem;flex-wrap:wrap"><b>·</b><span style="flex:1;min-width:10rem"><b>'+esc(r[1])+'</b> <small class="muted">'+esc([r[2],r[3]].filter(Boolean).join(' '))+' · '+esc(r[0])+'</small></span><button type="button" class="btn sm" data-act="hmpick" data-code="'+esc(r[0])+'" data-name="'+esc(r[1])+'">이 단지</button></li>';}).join('')+'</ul>'+
+    box.innerHTML=part+'<ul class="chk">'+j.list.map(function(r){return '<li style="align-items:center;gap:.6rem;flex-wrap:wrap"><b>·</b><span style="flex:1;min-width:10rem"><b>'+esc(r[1])+'</b> <small class="muted">'+esc([r[2],r[3]].filter(Boolean).join(' '))+' · '+esc(r[0])+'</small></span><button type="button" class="btn sm" data-act="hmpick" data-code="'+esc(r[0])+'" data-name="'+esc(r[1])+'">이 단지</button></li>';}).join('')+'</ul>'+
       (j.n>j.list.length?'<p class="muted" style="margin:.3rem 0 0">'+j.n+'곳 중 30곳만 보입니다. 이름을 더 길게 넣어 보세요.</p>':'');
   }).catch(function(e){box.innerHTML='<p class="note" style="margin:0">'+(/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다. GitHub 주소(guyeon9.github.io/hub)에서 동작합니다.':/not found|404/i.test(String(e))?'통로 서버를 새 코드로 바꿔야 "단지 찾기"가 동작합니다. 단지코드를 알면 아래에 바로 넣으세요.':esc(e.message||String(e)))+'</p>';});
 }
