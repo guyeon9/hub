@@ -126,6 +126,11 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .pv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.3rem .8rem;font-size:.85rem;cursor:pointer;color:var(--ink2)}
 .pv-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
 .lt-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:1.1rem 0 .55rem;padding:0;list-style:none}
+.sys-pick{display:flex;align-items:center;gap:.6rem;background:var(--accent-soft);border:1px solid var(--accent);border-radius:.6rem;padding:.45rem .6rem;margin-top:.4rem}
+.sys-pick[hidden]{display:none}
+.sys-pick-dot{flex:none;width:.8rem;height:.8rem;border-radius:3px}
+.sys-pick-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.sys-pick-t small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sd-what{margin:.5rem 0 .3rem;line-height:1.7;color:var(--ink)}
 .sd-sec{border-top:1px solid var(--line);padding:.35rem 0}
 .sd-sec>summary{cursor:pointer;font-weight:700;color:var(--ink);padding:.25rem 0;font-size:.95rem}
@@ -1807,7 +1812,7 @@ var SYS = (function () {
     Object.keys(S.inst).forEach(function (id) {
       S.inst[id].forEach(function (p, ii) {
         var n = p.n, k = KIND[n.k] || KIND.dev, q = px(p.x, p.y, p.z), on = sel === id, ht = hits && hits[id];
-        gl += '<g data-sysn="' + esc(id) + '" tabindex="0" role="button" aria-label="' + esc(n.t) + '" style="cursor:pointer">' + glyph(n.k, q[0], q[1], k[1], on);
+        gl += '<g data-sysn="' + esc(id) + '" tabindex="0" role="button" aria-label="' + esc(n.t) + '" style="cursor:pointer"><circle cx="' + q[0] + '" cy="' + q[1] + '" r="17" fill="#000" fill-opacity="0"/>' + (on ? '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="13" fill="none" stroke="' + k[1] + '" stroke-width="2.5" stroke-dasharray="4 3"/>' : '') + glyph(n.k, q[0], q[1], k[1], on);
         if (ht) gl += '<circle cx="' + (q[0] + 8) + '" cy="' + (q[1] - 8) + '" r="6.5" fill="#c2410c" stroke="#fff"/><text x="' + (q[0] + 8) + '" y="' + (q[1] - 5) + '" text-anchor="middle" font-size="8.5" fill="#fff" font-weight="700">' + (ht > 9 ? '9+' : ht) + '</text>';
         gl += '</g>';
         if (ii > 0 && !on) return; /* 여러 동에 같은 설비면 이름은 첫 번째만 */
@@ -2123,7 +2128,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.19.0';
+var APP_VER='1.19.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5336,15 +5341,15 @@ function sysPaint(){
       '<div class="row" style="justify-content:space-between;margin-bottom:.3rem;flex-wrap:wrap"><div class="seg" role="group" aria-label="보기">'+[['flow','흐름도'],['iso','입체 단면'],['3d','3D 돌려보기']].map(function(o){return '<button type="button" data-act="sysview" data-v="'+o[0]+'" aria-pressed="'+(vw===o[0])+'">'+o[1]+'</button>';}).join('')+'</div>'+
         (vw==='3d'?'<div class="row" style="gap:.3rem"><button type="button" class="btn ghost sm" data-act="sys3v" data-v="front">정면</button><button type="button" class="btn ghost sm" data-act="sys3v" data-v="top">위에서</button><button type="button" class="btn ghost sm" data-act="sys3v" data-v="in" aria-label="확대">＋</button><button type="button" class="btn ghost sm" data-act="sys3v" data-v="out" aria-label="축소">－</button><button type="button" class="btn ghost sm" data-act="sys3v" data-v="reset">처음 시점</button></div>'
           :'<button type="button" class="btn ghost sm" data-act="sysfit" aria-pressed="'+!!q.ui.fit+'">'+(q.ui.fit?'크게 보기':'한눈에 보기')+'</button>')+'</div>'+
-      (vw==='3d'?'<div id="sys3d" style="position:relative;height:clamp(300px,72vw,560px);border:1px solid var(--line);border-radius:.6rem;background:var(--surface2);overflow:hidden"></div>'
-        :'<div style="overflow:auto;border:1px solid var(--line);border-radius:.6rem;background:'+(vw==='iso'?'#fff':'var(--surface2)')+';-webkit-overflow-scrolling:touch" id="sys-svg"'+(q.ui.fit?' class="sys-fit"':'')+'>'+(vw==='iso'?SYS.iso(d,s,q.ui.sel,hits):SYS.svg(s,q.ui.sel,hits))+'</div>')+
+      '<div style="position:relative">'+(vw==='3d'?'<div id="sys3d" style="position:relative;height:clamp(300px,72vw,560px);border:1px solid var(--line);border-radius:.6rem;background:var(--surface2);overflow:hidden"></div>'
+        :'<div style="overflow:auto;border:1px solid var(--line);border-radius:.6rem;background:'+(vw==='iso'?'#fff':'var(--surface2)')+';-webkit-overflow-scrolling:touch" id="sys-svg"'+(q.ui.fit?' class="sys-fit"':'')+'>'+(vw==='iso'?SYS.iso(d,s,q.ui.sel,hits):SYS.svg(s,q.ui.sel,hits))+'</div>')+'<div id="sys-pick" class="sys-pick"'+(sel?'':' hidden')+'>'+(sel?sysPickHtml(sel):'')+'</div></div>'+
       '<p class="muted" style="font-size:.82rem;margin:.4rem 0 0">'+({flow:'왼쪽에서 오른쪽으로 흐릅니다. 그림이 넓으면 옆으로 밀어 보세요.',iso:'건물을 비스듬히 본 그림입니다. 설비가 실제 층 높이에 놓이고, 굵은 선이 배관·전선입니다. 연한 띠는 그 설비가 닿는 층입니다.',
         '3d':'끌어서 돌리고, 마우스 휠이나 두 손가락으로 확대합니다(Shift+끌기는 옆으로 이동). 3D 도구는 이 화면을 열 때 인터넷에서 불러옵니다.'}[vw])+' 설비를 누르면 아래에 자세히 나옵니다. 주황 숫자는 장기수선계획에 잡힌 항목 수입니다.</p>'+
       (vw!=='flow'&&SYS.bldgs(d).some(function(b){return b.guess;})?'<p class="note" style="margin:.4rem 0 0">층수를 모르는 동이 있어 높이를 짐작해 그렸습니다. "고치기"의 건물 칸에 층수를 넣으세요.</p>':'')+
       '<div class="row" style="flex-wrap:wrap;gap:.3rem;margin-top:.4rem">'+Object.keys(SYS.KIND).filter(function(k){return s.nodes.some(function(n){return n.k===k;});}).map(function(k){return '<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--ink2);margin-right:.6rem"><i style="width:.7rem;height:.7rem;border-radius:2px;background:'+SYS.KIND[k][1]+'"></i>'+SYS.KIND[k][0]+'</span>';}).join('')+'</div>'+
       '<div id="sys-detail" style="margin-top:.8rem">'+(sel?sysDetail(sel):'<p class="note">상자를 하나 눌러 보세요.</p>')+'</div>')+
     '</section>';
-  if(!q.ui.edit&&vw==='3d')sys3dStart(d,s,q.ui.sel,hits,function(id){q.ui.sel=id;save();var n=s.nodes.filter(function(x){return x.id===id;})[0],dt=$('#sys-detail');if(dt&&n){dt.innerHTML=sysDetail(n);}});
+  if(!q.ui.edit&&vw==='3d')sys3dStart(d,s,q.ui.sel,hits,function(id){q.ui.sel=id;save();var n=s.nodes.filter(function(x){return x.id===id;})[0],dt=$('#sys-detail'),pk=$('#sys-pick');if(dt&&n){dt.innerHTML=sysDetail(n);}if(pk&&n){pk.innerHTML=sysPickHtml(n);pk.hidden=false;}});
 }
 /* 높이로 본 양정 여유(대략) — 펌프 아래쪽으로 이어진 동의 층수로 계산 */
 function sysHead(n,e){
@@ -5362,6 +5367,10 @@ function sysHead(n,e){
   else{need=below+fl*FHm+(best.roof?3:0);how=(below?'지하 펌프실에서 ':'')+esc(best.b.t)+(best.roof?' 옥상 물탱크':' '+fl+'층')+'까지 높이 약 '+Math.round(need)+'m';}
   var r=head/need,v=r>=1.15?['여유 있는 편','#1f8a70']:r>=1?['빠듯한 편 — 배관 저항까지 따져 볼 필요','#a16207']:['부족할 수 있음 — 전문가 확인 권장','#b91c1c'];
   return '<div class="sd-head"><b>높이로 본 힘 (대략)</b><p>'+how+' → 필요 약 <b>'+Math.round(need)+'m</b>, 이 펌프 양정 <b>'+head+'m</b> · <span style="color:'+v[1]+';font-weight:700">'+v[0]+'</span></p><small class="muted">층 높이 2.8m로 가정한 계산입니다. 배관 마찰손실은 빼지 않았으니 참고만 하세요.</small></div>';
+}
+function sysPickHtml(n){
+  var k=SYS.KIND[n.k]||SYS.KIND.dev,e=SD.find(n);
+  return '<span class="sys-pick-dot" style="background:'+k[1]+'"></span><div class="sys-pick-t"><b>'+esc(n.t)+'</b><small>'+esc(n.spec||n.loc||k[0])+'</small></div><button type="button" class="btn sm" data-act="sysgo">'+(e?'설명 보기':'자세히')+' ↓</button>';
 }
 function sysDetail(n){
   var k=SYS.KIND[n.k]||SYS.KIND.dev,L=sysLtm(n),e=SD.find(n),row=function(a,b){return b?'<tr><th style="width:6.5rem;text-align:left">'+a+'</th><td>'+esc(b)+'</td></tr>':'';};
@@ -5437,6 +5446,7 @@ function sysAct(act,a){
   if(act==='syspaste'){var p=$('#sys-paste');sysPut(p?p.value:'');return true;}
   if(act==='sysblank'){q.data=SYS.norm({name:state.complex.name,src:'직접 작성',bldg:[{t:'101동',fl:15,b:1}],sys:[{id:'water',t:'급수',nodes:[{id:'w1',t:'상수도 인입',k:'src',fl:'G'},{id:'w2',t:'지하 저수조',k:'tank',fl:'B',ltm:'저수조'},{id:'w3',t:'세대',k:'use',bd:'각 동',fl:'ALL'}],links:[{a:'w1',b:'w2'},{a:'w2',b:'w3'}]}]});q.ui.edit=true;saveNow();sysPaint();return true;}
   if(act==='sysclear'){if(!confirm('지금 계통도를 지우고 새 자료를 넣을까요? (먼저 "파일로 저장"을 권합니다)'))return true;q.data=null;q.ui.sel='';saveNow();sysPaint();return true;}
+  if(act==='sysgo'){var dt=$('#sys-detail'),tp=document.querySelector('.top');if(dt){var off=(tp?tp.getBoundingClientRect().bottom:0)+8;window.scrollTo({top:window.scrollY+dt.getBoundingClientRect().top-off,behavior:'smooth'});}return true;}
   if(act==='sysview'){q.ui.view=a.dataset.v;save();sysPaint();return true;}
   if(act==='sys3v'){if(S3.view)S3.view(a.dataset.v);return true;}
   if(act==='sysbadd'){(q.data.bldg=q.data.bldg||[]).push({t:(q.data.bldg.length+1)+'동',fl:'15',b:'1',note:''});saveNow();sysPaint();return true;}
@@ -5456,7 +5466,7 @@ function sysAct(act,a){
 }
 function sysClick(e){
   var t=e.target.closest('[data-syss]');if(t){var q=SQ();q.ui.s=t.dataset.syss;q.ui.sel='';save();sysPaint();return true;}
-  var g=e.target.closest('[data-sysn]');if(g){var q2=SQ();q2.ui.sel=g.getAttribute('data-sysn');save();var y=window.scrollY,sc=$('#sys-svg'),sl=sc?sc.scrollLeft:0;sysPaint();window.scrollTo(0,y);var sc2=$('#sys-svg');if(sc2)sc2.scrollLeft=sl;var dt=$('#sys-detail');if(dt&&dt.getBoundingClientRect().top>window.innerHeight-80)dt.scrollIntoView({behavior:'smooth',block:'nearest'});return true;}
+  var g=e.target.closest('[data-sysn]');if(g){var q2=SQ();q2.ui.sel=g.getAttribute('data-sysn');save();var y=window.scrollY,sc=$('#sys-svg'),sl=sc?sc.scrollLeft:0;sysPaint();window.scrollTo(0,y);var sc2=$('#sys-svg');if(sc2)sc2.scrollLeft=sl;var pk=$('#sys-pick');if(pk){var r=pk.getBoundingClientRect();if(r.bottom>window.innerHeight-8)window.scrollBy({top:r.bottom-window.innerHeight+16,behavior:'smooth'});}return true;}
   return false;
 }
 
@@ -5504,7 +5514,9 @@ function sys3dBuild(T,wrap,d,sy,sel,hits,onPick){
   var gp=new T.Mesh(new T.PlaneGeometry(Sc.W+60,BD+60),new T.MeshBasicMaterial({color:col('#8fb98b'),transparent:true,opacity:.22,side:T.DoubleSide,depthWrite:false}));
   gp.rotation.x=-Math.PI/2;gp.position.set(0,0,0);scene.add(gp);
   var lab=[],pick=[];
-  function addLab(html,p,cls,id){var el=document.createElement('div');el.className='s3l'+(cls?' '+cls:'');el.innerHTML=html;lay.appendChild(el);lab.push({el:el,p:p,id:id});return el;}
+  function addLab(html,p,cls,id){var el=document.createElement('div');el.className='s3l'+(cls?' '+cls:'');el.innerHTML=html;lay.appendChild(el);lab.push({el:el,p:p,id:id});
+    if(id){el.style.pointerEvents='auto';el.style.cursor='pointer';el.setAttribute('role','button');el.setAttribute('data-s3id',id);el.addEventListener('click',function(ev){ev.stopPropagation();setSel(id);if(onPick)onPick(id);});}
+    return el;}
   /* 건물·공용 지하 */
   Sc.C.forEach(function(c){
     if(c.hide)return;
@@ -5576,9 +5588,11 @@ function sys3dBuild(T,wrap,d,sy,sel,hits,onPick){
     if(ks.length===2){var a=P[ks[0]],b=P[ks[1]],dd=Math.hypot(a.x-b.x,a.y-b.y);if(pinch&&dd)S3.cam.zoom*=pinch/dd;pinch=dd;}
     draw();});
   function up(e){var one=Object.keys(P).length===1;delete P[e.pointerId];pinch=0;
-    if(one&&moved<6){var rc=cv.getBoundingClientRect(),m=new T.Vector2((e.clientX-rc.left)/rc.width*2-1,-(e.clientY-rc.top)/rc.height*2+1),ray=new T.Raycaster();ray.setFromCamera(m,cam);
-      var hs=ray.intersectObjects(pick,false);hs.sort(function(a,b){return (a.object.userData.band?1:0)-(b.object.userData.band?1:0)||a.distance-b.distance;});
-      if(hs.length){var id=hs[0].object.userData.id;setSel(id);if(onPick)onPick(id);}}}
+    if(one&&moved<(e.pointerType==='mouse'?6:14)){var rc=cv.getBoundingClientRect(),px=e.clientX-rc.left,py=e.clientY-rc.top,best=null,bd=e.pointerType==='mouse'?26:38,v=new T.Vector3();
+      /* 화면에서 가장 가까운 설비부터(작은 설비도 잘 눌리게) */
+      pick.forEach(function(o){if(o.userData.band)return;v.copy(o.position).project(cam);if(v.z>1)return;var sx=(v.x+1)/2*rc.width,sy=(1-v.y)/2*rc.height,dd=Math.hypot(sx-px,sy-py);if(dd<bd){bd=dd;best=o;}});
+      if(!best){var m=new T.Vector2(px/rc.width*2-1,-py/rc.height*2+1),ray=new T.Raycaster();ray.setFromCamera(m,cam);var hs=ray.intersectObjects(pick,false);hs.sort(function(a,b){return (a.object.userData.band?1:0)-(b.object.userData.band?1:0)||a.distance-b.distance;});if(hs.length)best=hs[0].object;}
+      if(best){var id=best.userData.id;setSel(id);if(onPick)onPick(id);}}}
   cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',function(e){delete P[e.pointerId];pinch=0;});
   cv.addEventListener('contextmenu',function(e){e.preventDefault();});
   cv.addEventListener('wheel',function(e){e.preventDefault();S3.cam.zoom*=1+Math.max(-.3,Math.min(.3,e.deltaY*.0012));draw();},{passive:false});
