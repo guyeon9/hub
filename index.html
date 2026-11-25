@@ -126,6 +126,21 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .pv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.3rem .8rem;font-size:.85rem;cursor:pointer;color:var(--ink2)}
 .pv-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
 .lt-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:1.1rem 0 .55rem;padding:0;list-style:none}
+.demobar{background:#fff4d6;border-bottom:1px solid #e9c46a;color:#5b4300;padding:.45rem 0;font-size:.88rem}
+.demobar[hidden]{display:none}
+.su{border:2px solid var(--accent)}
+.su-list{list-style:none;margin:0;padding:0;display:grid;gap:.7rem}
+.su-step{border:1px solid var(--line);border-radius:.6rem;padding:.6rem .75rem;background:var(--surface)}
+.su-step.ok{background:var(--surface2)}
+.su-step.ok .su-b{display:none}
+.su-h{display:flex;align-items:center;gap:.5rem}
+.su-n{flex:none;display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:.85rem}
+.su-step.ok .su-n{background:var(--ok,#1f8a70)}
+.su-b{margin-top:.5rem}
+.su-chk{display:flex;flex-wrap:wrap;gap:.4rem .9rem}
+.su-chk label{display:inline-flex;align-items:center;gap:.3rem;font-size:.92rem}
+.su-chk input{width:auto}
+.su-demo{margin-top:.8rem;padding:.6rem .75rem;border-radius:.6rem;background:var(--accent-soft);font-size:.9rem}
 .sys-pick{display:flex;align-items:center;gap:.6rem;background:var(--accent-soft);border:1px solid var(--accent);border-radius:.6rem;padding:.45rem .6rem;margin-top:.4rem}
 .sys-pick[hidden]{display:none}
 .sys-pick-dot{flex:none;width:.8rem;height:.8rem;border-radius:3px}
@@ -2128,7 +2143,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.19.1';
+var APP_VER='1.20.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2159,12 +2174,12 @@ function merge(def,src){
 }
 var state=load();
 function load(){
-  try{var s=localStorage.getItem(KEY);if(s){var o=JSON.parse(s);if(o&&o.v===1)return merge(defaultState(),o);}}catch(e){}
+  try{var s=localStorage.getItem(curKey());if(s){var o=JSON.parse(s);if(o&&o.v===1)return merge(defaultState(),o);}}catch(e){}
   return defaultState();
 }
 var saveT=null;
-function save(){clearTimeout(saveT);saveT=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}},150);}
-function saveNow(){clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+function save(){clearTimeout(saveT);saveT=setTimeout(function(){stamp();try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}afSchedule();},150);}
+function saveNow(){clearTimeout(saveT);stamp();try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}afSchedule();}
 
 /* ───────── 안전관리계획서 양식 ───────── */
 var SPT=[];
@@ -2879,9 +2894,10 @@ function shell(){
     '</div></div>'+
   '</div><nav class="tabs" id="tabs" aria-label="메뉴">'+
     TABS.map(function(t){return '<button type="button" data-tab="'+t.id+'">'+t.t+(t.s?'<small>'+t.s+'</small>':'')+'</button>';}).join('')+
-  '</nav></header><main class="wrap" id="view"></main>'+
-  '<footer class="wrap muted" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem">결과는 참고용이며 최종 확인 책임은 관리주체에 있습니다. 입력한 내용은 이 브라우저에만 저장됩니다. K-apt·법령 조회를 누를 때만 단지코드와 조회 조건이 통로 서버로 나가며, 불러온 파일은 밖으로 보내지 않습니다. · 버전 '+APP_VER+'</footer>';
+  '</nav></header><div id="demobar" class="demobar" hidden><div class="wrap row" style="justify-content:space-between"><span><b>예시 단지를 보는 중입니다.</b> 가상의 단지라 마음껏 눌러 봐도 내 자료에는 섞이지 않습니다.</span><button type="button" class="btn sm" id="demoend">예시 끝내고 내 자료로</button></div></div><main class="wrap" id="view"></main>'+
+  '<footer class="wrap muted" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem">결과는 참고용이며 최종 확인 책임은 관리주체에 있습니다. 입력한 내용은 이 브라우저에 저장되고, 자동 저장 파일을 연결하면 소장님이 고른 파일에도 저장됩니다. K-apt·법령 조회를 누를 때만 단지코드와 조회 조건이 통로 서버로 나가며, 불러온 파일은 밖으로 보내지 않습니다. · 버전 '+APP_VER+'</footer>';
   $('#tabs').addEventListener('click',function(e){var b=e.target.closest('button[data-tab]');if(b)go(b.dataset.tab);});
+  $('#demoend').addEventListener('click',demoEnd);
   $('#fontseg').addEventListener('click',function(e){var b=e.target.closest('button[data-f]');if(!b)return;state.ui.font=b.dataset.f;save();applyFont();paintFont();});
   var v=$('#view');
   v.addEventListener('input',onInput);
@@ -2920,8 +2936,8 @@ function renderHome(v){
   var c=state.complex,m=state.meeting;
   var nEd=Object.keys(state.safety.edits||{}).length;
   v.innerHTML=
-  bkNote()+'<h1 class="h-title">구연 관리도우미</h1><p class="lead">단지 정보를 한 번만 입력하면 모든 메뉴가 같이 씁니다. 안건·공고, 안전관리계획, 관리규약 개정, 입찰·계약, 선거를 쓸 수 있고, 나머지 메뉴는 순서대로 열립니다.</p>'+
-  '<div class="home-grid"><div>'+calHomeCard()+
+  afBanner()+(isDemo()?'':bkNote())+'<h1 class="h-title">구연 관리도우미</h1><p class="lead">단지 정보를 한 번만 넣으면 모든 메뉴가 같이 씁니다. 처음이면 아래 "처음 시작하기"부터, 그다음부터는 "이번 주 할 일"만 보셔도 됩니다.</p>'+setupCard()+
+  '<div class="home-grid"><div>'+weekCard()+
     '<section class="card"><h2>단지 정보 <small>모든 메뉴에서 공통으로 사용</small></h2><div class="grid2">'+
       F('단지명','complex.name',c.name)+F('입주자대표회의 명칭','complex.council',c.council)+
       F('세대수','complex.units',c.units)+F('관리소장','complex.director',c.director)+
@@ -2951,7 +2967,7 @@ function renderHome(v){
     '<section class="card"><h2>다음 회의</h2><dl class="next"><dt>일시</dt><dd>'+esc(dParen(m.date))+' '+esc(tK(m.time))+'</dd><dt>장소</dt><dd>'+esc(m.place)+'</dd><dt>안건</dt><dd>'+state.agendas.length+'건</dd></dl>'+
       '<div class="row" style="margin-top:.8rem"><button type="button" class="btn" data-go="agenda">안건·공고 열기</button><button type="button" class="btn ghost" data-act="newmeeting">새 회의 시작</button></div>'+
       '<p class="muted" style="margin:.6rem 0 0">새 회의를 시작하면 안건을 비우고 회의일을 다음 달로 옮깁니다. 공고 번호와 공고일은 새로 입력하세요.</p></section>'+
-    '<section class="card"><h2>저장 파일 <small>컴퓨터를 바꿔도 이어서 쓸 수 있습니다</small></h2><div class="row">'+
+    '<section class="card"><h2>저장 파일 <small>컴퓨터를 바꿔도 이어서 쓸 수 있습니다</small></h2><div class="af-box" style="margin-bottom:.8rem">'+afHtml()+'</div><p class="muted" style="margin:0 0 .4rem;font-size:.85rem">한 번씩 손으로 보관하는 파일:</p>'+(isDemo()?'<div class="row"><button type="button" class="btn" data-act="hmdemoend">예시 끝내고 내 자료로</button></div>':'')+'<div class="row">'+
       '<button type="button" class="btn" data-act="export">내보내기</button>'+
       '<button type="button" class="btn ghost" data-act="import">불러오기</button><input type="file" id="impfile" accept=".json,application/json" hidden>'+
       '<button type="button" class="btn danger sm" data-act="reset">처음 상태로</button></div>'+
@@ -5298,6 +5314,224 @@ function calAct(act,a){
 function calRefresh(){if(tab==='cal')calPaint();else if(tab==='home'){var y=window.scrollY;go('home',true);window.scrollTo(0,y);}}
 
 
+/* ═════════ 홈: 시작 도우미 · 이번 주 할 일 · 예시 단지 · 자동 저장 파일 ═════════ */
+var DEMO_KEY='guyeon-hub-demo';
+function isDemo(){try{return sessionStorage.getItem('guyeon-demo')==='1';}catch(e){return false;}}
+function curKey(){return isDemo()?DEMO_KEY:KEY;}
+function stamp(){if(!AF.boot)state.ui.savedAt=new Date().toISOString();}
+
+/* ── 자동 저장 파일 (크롬·엣지 컴퓨터: 고른 파일에 바뀔 때마다 저장) ── */
+var AF={h:null,ok:false,need:false,hold:false,at:'',err:'',name:'',boot:true},afT=null;
+function afSupported(){try{return typeof window.showSaveFilePicker==='function'&&typeof window.showOpenFilePicker==='function';}catch(e){return false;}}
+function idb(){return new Promise(function(ok,no){try{var r=indexedDB.open('guyeon-hub-fs',1);r.onupgradeneeded=function(){r.result.createObjectStore('kv');};r.onsuccess=function(){ok(r.result);};r.onerror=function(){no(r.error);};}catch(e){no(e);}});}
+function idbGet(k){return idb().then(function(db){return new Promise(function(ok){var t=db.transaction('kv','readonly').objectStore('kv').get(k);t.onsuccess=function(){ok(t.result||null);};t.onerror=function(){ok(null);};});}).catch(function(){return null;});}
+function idbSet(k,v){return idb().then(function(db){return new Promise(function(ok){var t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=function(){ok(true);};t.onerror=function(){ok(false);};});}).catch(function(){return false;});}
+function idbDel(k){return idb().then(function(db){return new Promise(function(ok){var t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=function(){ok(true);};t.onerror=function(){ok(false);};});}).catch(function(){return false;});}
+function afPaint(){$$('.af-box').forEach(function(b){b.innerHTML=afHtml();});var bn=$('#af-banner');if(bn)bn.outerHTML=afBanner();else if(tab==='home'){var v=$('#view');if(v&&afBanner())v.insertAdjacentHTML('afterbegin',afBanner());}}
+function afInit(){
+  if(!afSupported()||isDemo()){AF.boot=false;return;}
+  idbGet('auto').then(function(h){if(!h)return;AF.h=h;AF.name=h.name;
+    return h.queryPermission({mode:'readwrite'}).then(function(p){if(p==='granted'){AF.ok=true;return afCheckNewer();}AF.need=true;afPaint();});
+  }).catch(function(){}).then(function(){AF.boot=false;});
+}
+function afCheckNewer(){
+  if(!AF.h)return Promise.resolve();
+  return AF.h.getFile().then(function(f){return f.text();}).then(function(t){
+    var o=null;try{o=JSON.parse(t);}catch(e){}
+    var fa=o&&o.ui&&o.ui.savedAt||'',la=state.ui.savedAt||'';
+    var fileData=o&&o.v===1&&o.complex&&o.complex.name&&o.complex.name!=='○○아파트';
+    if(o&&o.v===1&&o.complex&&((fa&&(!la||fa>la))||(fileData&&!hasData()))){AF.hold=true;AF.fileAt=fa;}
+    else{AF.hold=false;afWrite();}
+    afPaint();
+  }).catch(function(){AF.hold=false;afPaint();});
+}
+function afWrite(){
+  if(!AF.ok||!AF.h||AF.hold||isDemo())return Promise.resolve();
+  var txt=JSON.stringify(state);
+  return AF.h.createWritable().then(function(w){return w.write(txt).then(function(){return w.close();});}).then(function(){
+    var n=new Date();AF.at=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');AF.err='';
+    var d=calToday();if(state.ui.bk!==d){state.ui.bk=d;try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}}
+    var s=$('#af-at');if(s)s.textContent=AF.at+' 저장됨';
+  }).catch(function(e){AF.ok=false;AF.need=true;AF.err=String(e&&e.message||e);afPaint();});
+}
+function afSchedule(){if(!AF.ok||AF.hold||isDemo())return;clearTimeout(afT);afT=setTimeout(afWrite,1500);}
+function afConnect(){
+  if(!afSupported()){toast('이 브라우저는 자동 저장 파일을 지원하지 않습니다. 크롬·엣지(컴퓨터)에서 연결하세요.');return;}
+  window.showSaveFilePicker({suggestedName:'구연관리도우미_자동저장.json',types:[{description:'구연 관리도우미 저장 파일',accept:{'application/json':['.json']}}]}).then(function(h){
+    AF.h=h;AF.name=h.name;AF.ok=true;AF.need=false;AF.hold=false;stamp();try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}
+    idbSet('auto',h);return afWrite().then(function(){afPaint();toast('자동 저장 파일을 연결했습니다. 이제 바뀔 때마다 이 파일에도 저장됩니다.');if(tab==='home')go('home',true);});
+  }).catch(function(e){if(e&&e.name!=='AbortError')toast('파일을 연결하지 못했습니다.');});
+}
+function afOpen(){
+  if(!afSupported()){toast('이 브라우저는 파일 연결을 지원하지 않습니다. "불러오기"로 저장 파일을 넣으세요.');return;}
+  window.showOpenFilePicker({types:[{description:'구연 관리도우미 저장 파일',accept:{'application/json':['.json']}}]}).then(function(hs){
+    var h=hs[0];return h.getFile().then(function(f){return f.text();}).then(function(t){
+      var o=JSON.parse(t);if(!o||o.v!==1||!o.complex)throw new Error('형식');
+      if(hasData()&&!confirm('지금 이 브라우저의 자료를 파일 내용('+(o.complex.name||'')+')으로 바꿉니다. 계속할까요?'))return;
+      state=merge(defaultState(),o);try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}
+      return h.requestPermission({mode:'readwrite'}).then(function(p){AF.h=h;AF.name=h.name;AF.ok=p==='granted';AF.need=!AF.ok;AF.hold=false;idbSet('auto',h);
+        applyFont();paintFont();updateChip();go('home',true);toast('저장 파일을 불러왔습니다.'+(AF.ok?' 이 파일에 계속 자동 저장합니다.':''));});
+    });
+  }).catch(function(e){if(e&&e.name!=='AbortError')toast('이 허브에서 만든 저장 파일이 아닙니다.');});
+}
+function afAllow(){if(!AF.h)return;AF.h.requestPermission({mode:'readwrite'}).then(function(p){if(p==='granted'){AF.ok=true;AF.need=false;return afCheckNewer().then(function(){toast('자동 저장을 다시 켰습니다.');});}toast('허용하지 않아 자동 저장이 꺼져 있습니다.');});}
+function afUseFile(){if(!AF.h)return;AF.h.getFile().then(function(f){return f.text();}).then(function(t){var o=JSON.parse(t);state=merge(defaultState(),o);AF.hold=false;try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}applyFont();paintFont();updateChip();go(tab,true);toast('자동 저장 파일의 최신 내용으로 바꿨습니다.');});}
+function afKeepLocal(){AF.hold=false;stamp();try{localStorage.setItem(curKey(),JSON.stringify(state));}catch(e){}afWrite().then(function(){afPaint();toast('지금 화면 내용을 파일에 저장했습니다.');});}
+function afOff(){if(!confirm('자동 저장 파일 연결을 끊을까요? (파일은 지워지지 않습니다)'))return;AF={h:null,ok:false,need:false,hold:false,at:'',err:'',name:'',boot:false};idbDel('auto');afPaint();if(tab==='home')go('home',true);}
+function afFmt(iso){var d=new Date(iso);if(isNaN(d))return '';return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function afBanner(){
+  if(isDemo())return '';
+  if(AF.hold)return '<div class="note af-ban" id="af-banner" style="border-color:var(--warn);margin-bottom:1rem"><b>자동 저장 파일이 더 최신입니다</b><br>다른 컴퓨터에서 '+esc(afFmt(AF.fileAt))+'에 저장한 내용이 있습니다. 어느 쪽을 쓸까요?<div class="row" style="margin-top:.5rem"><button type="button" class="btn sm" data-act="hmafuse">파일 내용으로 바꾸기 (권장)</button><button type="button" class="btn ghost sm" data-act="hmafkeep">지금 화면 내용을 파일에 저장</button></div></div>';
+  if(AF.need)return '<div class="note af-ban" id="af-banner" style="border-color:var(--warn);margin-bottom:1rem"><b>자동 저장이 잠시 멈춰 있습니다</b> — 브라우저를 다시 열면 한 번 허용해야 합니다. <button type="button" class="btn sm" data-act="hmafallow">자동 저장 다시 켜기</button></div>';
+  return '';
+}
+function afHtml(){
+  if(isDemo())return '<p class="muted" style="margin:0">예시 단지를 보는 동안에는 자동 저장 파일에 쓰지 않습니다.</p>';
+  if(!afSupported())return '<p class="muted" style="margin:0">이 브라우저(휴대폰·사파리·파이어폭스 등)는 자동 저장 파일을 쓸 수 없습니다. 컴퓨터의 크롬·엣지에서 연결하거나, 아래 "내보내기"로 파일을 보관하세요.</p>';
+  if(AF.ok&&!AF.hold)return '<p style="margin:0"><span class="tag on">자동 저장 켜짐</span> <b>'+esc(AF.name)+'</b> <span class="muted" id="af-at">'+(AF.at?AF.at+' 저장됨':'')+'</span></p><p class="muted" style="margin:.3rem 0 0;font-size:.85rem">바뀔 때마다 이 파일에도 저장됩니다. 원드라이브·구글드라이브 폴더에 두었다면 다른 컴퓨터에서도 "자동 저장 파일 열기"로 이어서 쓸 수 있습니다.</p><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="hmafoff">연결 끊기</button></div>';
+  if(AF.h)return '<p style="margin:0"><span class="tag soon">자동 저장 멈춤</span> '+esc(AF.name)+'</p><div class="row" style="margin-top:.4rem"><button type="button" class="btn sm" data-act="hmafallow">다시 켜기</button><button type="button" class="btn ghost sm" data-act="hmafoff">연결 끊기</button></div>';
+  return '<p style="margin:0 0 .4rem"><span class="tag soon">자동 저장 꺼짐</span> 지금은 이 브라우저 안에만 저장됩니다.</p>'+
+    '<div class="row"><button type="button" class="btn" data-act="hmafconn">자동 저장 파일 만들기</button><button type="button" class="btn ghost" data-act="hmafopen">자동 저장 파일 열기 (다른 컴퓨터에서 만든 것)</button></div>'+
+    '<p class="muted" style="margin:.4rem 0 0;font-size:.85rem">파일을 <b>원드라이브(OneDrive)·구글드라이브 폴더</b>에 만들어 두면, 컴퓨터를 바꿔도 그 파일을 열어 그대로 이어서 씁니다. 파일은 소장님 드라이브에만 있고 밖으로 보내지 않습니다.</p>';
+}
+
+/* ── 시작 도우미 ── */
+function SU(){if(!state.ui.setup)state.ui.setup={};return state.ui.setup;}
+function setupSteps(){
+  var c=state.complex,s=SU(),bk=bkDays();
+  return [
+    {k:'name',t:'단지 이름과 세대수',done:c.name&&c.name!=='○○아파트'&&!!c.units},
+    {k:'kapt',t:'K-apt에서 한 번에 가져오기',done:!!s.pulled},
+    {k:'cal',t:'우리 단지에 있는 설비 고르기',done:!!s.cal},
+    {k:'bk',t:'자동 저장 파일 연결 (또는 백업 파일)',done:AF.ok||(bk!==null&&bk<30)}
+  ];
+}
+function setupCard(){
+  if(isDemo())return '';
+  var S=setupSteps(),n=S.filter(function(x){return x.done;}).length,s=SU(),c=state.complex,h=CQ().have;
+  if(s.hide&&n<S.length)return '<div class="row" style="margin:0 0 1rem"><button type="button" class="btn ghost sm" data-act="hmsetshow">처음 시작하기 다시 보기 ('+n+'/'+S.length+')</button></div>';
+  if(s.hide)return '';
+  var st=function(i,body){var x=S[i];return '<li class="su-step'+(x.done?' ok':'')+'"><div class="su-h"><b class="su-n">'+(x.done?'✓':i+1)+'</b><b>'+esc(x.t)+'</b>'+(x.done?' <span class="tag on">완료</span>':'')+'</div><div class="su-b">'+body+'</div></li>';};
+  return '<section class="card su"><div class="row" style="justify-content:space-between;align-items:baseline"><h2 style="margin:0">처음 시작하기 <small>'+n+'/'+S.length+' 완료</small></h2><button type="button" class="btn ghost sm" data-act="hmsethide">'+(n===S.length?'닫기':'나중에 하기')+'</button></div>'+
+    '<p class="muted" style="margin:.3rem 0 .8rem">네 단계만 하면 업무달력·계약 만료·장기수선 충당금이 자동으로 채워집니다. 처음이라 막막하면 맨 아래 <b>예시 단지</b>부터 둘러보세요.</p><ol class="su-list">'+
+    st(0,'<div class="grid2"><label class="f"><span>단지명</span><input type="text" data-bind="complex.name" value="'+esc(c.name==='○○아파트'?'':c.name)+'" placeholder="예: 행복마을아파트"></label><label class="f"><span>세대수</span><input type="text" inputmode="numeric" data-bind="complex.units" value="'+esc(c.units)+'" placeholder="예: 480"></label></div>')+
+    st(1,'<p class="muted" style="margin:0 0 .4rem">K-apt 누리집 → 우리단지 기본정보에서 <b>단지코드</b>(A로 시작하는 9자리)를 찾아 넣고 누르세요. 단지 정보, 계약 만료일, 장기수선충당금 잔액을 한 번에 가져옵니다.</p>'+
+      '<div class="row" style="align-items:flex-end"><label class="f" style="flex:1;min-width:9rem;margin:0"><span>K-apt 단지코드</span><input type="text" data-bind="kapt.code" value="'+esc(state.kapt.code)+'" placeholder="A12345678" autocapitalize="characters"></label><button type="button" class="btn" data-act="hmpull">한 번에 가져오기</button></div><div id="hm-pull" style="margin-top:.5rem">'+(s.pullMsg||'')+'</div>')+
+    st(2,'<p class="muted" style="margin:0 0 .4rem">있는 설비만 고르면 업무달력이 법정 점검 날짜를 잡습니다.</p><div class="su-chk">'+
+      [['elev','승강기'],['play','어린이놀이시설'],['tank','저수조(물탱크)'],['septic','정화조'],['fireFull','소방 종합점검 대상'],['disinf','소독 의무 대상']].map(function(o){return '<label><input type="checkbox" data-bind="cal.have.'+o[0]+'"'+(h[o[0]]?' checked':'')+'> '+o[1]+'</label>';}).join('')+
+      '</div><div class="row" style="margin-top:.4rem"><button type="button" class="btn sm" data-act="hmcalok">이대로 할게요</button><button type="button" class="btn ghost sm" data-go="cal">업무달력에서 자세히</button></div>')+
+    st(3,'<div class="af-box">'+afHtml()+'</div>'+(afSupported()?'':'<div class="row" style="margin-top:.4rem"><button type="button" class="btn sm" data-act="export">백업 파일 내보내기</button></div>'))+
+    '</ol><div class="su-demo"><b>처음이라 감이 안 오면</b> 가상의 단지로 모든 메뉴가 채워진 모습을 먼저 보세요. 지금 자료는 그대로 있습니다. <button type="button" class="btn ghost sm" data-act="hmdemo">예시 단지 둘러보기</button></div></section>';
+}
+function setupPull(){
+  var code=kcode(),api=kapiBase(),box=$('#hm-pull'),s=SU(),out=[];
+  if(!/^A\d{8}$/.test(code)){toast('단지코드는 A로 시작하는 9자리입니다. 예: A12345678');return;}
+  var show=function(){var h='<ul class="sd-list">'+out.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';s.pullMsg=h;if(box)box.innerHTML=h;};
+  out.push('<span class="muted">K-apt에서 가져오는 중… (20초쯤)</span>');show();out=[];
+  var J=function(p){return fetch(api+p).then(function(r){return r.json();});};
+  J('/api/info?code='+code).then(function(j){
+    if(!j||!j.ok)throw new Error('단지 정보를 찾지 못했습니다');
+    if(j.basic&&j.basic.bjdCode){state.kapt.bjd=String(j.basic.bjdCode);state.kapt.bjdOf=code;}
+    var m=kaptMap(j.basic,j.detail),n=0;
+    m.rows.forEach(function(r){if(!r.on||(r.cur&&!r.same))return;r.targets.forEach(function(t){if(t.indexOf('sp:')===0){var k=t.slice(3);if(r.val===spBase(k))delete state.safety.edits[k];else state.safety.edits[k]=r.val;}else if(t==='complex.units'){state.complex.units=String(r.val).replace(/[^\d]/g,'');}else setPath(state,t,r.val);});n++;});
+    var A={};Object.keys(j.basic||{}).forEach(function(k){A[k]=j.basic[k];});Object.keys(j.detail||{}).forEach(function(k){A[k]=j.detail[k];});
+    var rg=regionOf(kg(A,['doroJuso','kaptAddr']));if(rg&&!state.complex.region)state.complex.region=rg;
+    var c=CQ(),ud=kg(A,['kaptUsedate']),ec=+(kg(A,['kaptdEcnt','kaptdEcntp'])||0),extra=[];
+    if(/^\d{8}$/.test(ud)){if(!c.fireMonth){c.fireMonth=String(+ud.slice(4,6));extra.push('소방점검 달 '+c.fireMonth+'월(사용검사일 달)');}if(!c.elevYear&&ec){c.elevYear=ud.slice(0,4);extra.push('승강기 설치연도 '+c.elevYear+'년(준공 연도 — 승강기를 바꿨다면 고치세요)');}
+      var L=LQ();if(!L.meta.use){L.meta.use=ud.slice(0,4)+'-'+ud.slice(4,6)+'-'+ud.slice(6,8);}}
+    if(kg(A,['kaptdEcnt','kaptdEcntp'])!=='')c.have.elev=ec>0;
+    state.safety.ver=SP_VER;saveNow();updateChip();
+    out.push('<b>단지 정보</b> '+n+'개 항목을 넣었습니다'+(m.rows.some(function(r){return r.cur&&!r.same;})?' (지금 값과 다른 항목은 건드리지 않았습니다 — 아래 단지 정보의 K-apt 불러오기에서 골라 넣으세요)':'')+'.'+(extra.length?' '+esc(extra.join(', '))+'.':''));show();
+    return J('/api/contracts?code='+code).then(function(j2){if(!j2.ok)throw 0;c.cons=CAL.conGroups(j2.list,calToday());c.conAt=calToday();saveNow();
+      out.push('<b>계약 만료</b> 이어지는 계약 '+c.cons.length+'갈래를 업무달력에 넣었습니다'+(c.cons.length?' ('+c.cons.slice(0,4).map(function(o){return esc(o.t)+' ~'+esc(o.ed);}).join(', ')+(c.cons.length>4?' 외':'')+')':'')+'.');show();},function(){out.push('<b>계약 만료</b> 가져오지 못했습니다. 업무달력 → 계약 만료에서 다시 눌러 주세요.');show();});
+  }).then(function(){
+    return J('/api/ltm?code='+code).then(function(j3){if(!j3.ok)throw 0;var L=LQ(),f=j3.fund||{};L.kf=Object.assign({at:ltToday()},f);
+      if(f.bal&&!L.meta.bal){L.meta.bal=f.bal.v;L.meta.balDate=String(f.bal.ym).slice(0,4)+'-'+String(f.bal.ym).slice(4,6);}
+      saveNow();out.push('<b>장기수선충당금</b> '+(f.bal?'잔액 '+LT.won(f.bal.v)+'원('+String(f.bal.ym).slice(0,4)+'.'+String(f.bal.ym).slice(4,6)+' 기준)':'최근 6개월 잔액이 아직 공개되지 않았습니다')+'.');show();},function(){out.push('<b>장기수선충당금</b> 가져오지 못했습니다.');show();});
+  }).then(function(){s.pulled=calToday();saveNow();toast('K-apt에서 가져왔습니다. 아래 "이번 주 할 일"을 확인하세요.');var y=window.scrollY;go('home',true);window.scrollTo(0,y);})
+  .catch(function(e){out.push('<span style="color:var(--warn)">'+(/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다. 이 기능은 GitHub 주소(guyeon9.github.io/hub)에서 동작합니다.':esc(e.message||String(e)))+'</span>');show();});
+}
+
+/* ── 이번 주 할 일 ── */
+var CAL_GO={'관리규약':'rules','입찰·계약':'bid','계약 만료':'bid','선거':'elect'};
+function weekCard(){
+  var t=calToday(),t7=addDays(t,7),B=calBuckets(),rows=[],s=SU(),m=state.meeting;
+  var cal=B.late.concat(B.now,B.soon).filter(function(x){return x.st==='late'||(x.due&&x.due<=t7);}).sort(function(a,b){return String(a.due).localeCompare(String(b.due));});
+  var extra=[];
+  if(!isDemo()&&hasData()&&!AF.ok){var d=bkDays();if(d===null||d>=14)extra.push({t:'자료 백업하기',sub:d===null?'아직 백업한 적이 없습니다. 컴퓨터를 바꾸면 자료가 옮겨지지 않습니다.':d+'일 전에 마지막으로 백업했습니다.',btn:afSupported()?'<button type="button" class="btn sm" data-act="hmafconn">자동 저장 켜기</button>':'<button type="button" class="btn sm" data-act="export">내보내기</button>',warn:1});}
+  if(m.date&&m.date>=t&&m.date<=addDays(t,10)){var left=Math.round((parseIso(m.date).t-parseIso(t).t)/864e5);extra.push({t:'입주자대표회의 '+(left?'D-'+left:'오늘')+' ('+dShort(m.date)+')',sub:'안건 '+state.agendas.length+'건 · 개최공고·회의록 양식 확인',btn:'<button type="button" class="btn ghost sm" data-go="agenda">열기</button>'});}
+  if(B.need.length)extra.push({t:'날짜를 넣어야 계산되는 법정 업무 '+B.need.length+'개',sub:B.need.slice(0,3).map(function(x){return x.t;}).join(', ')+(B.need.length>3?' 외':''),btn:'<button type="button" class="btn ghost sm" data-act="hmcalset">날짜 넣기</button>'});
+  var more=Math.max(0,cal.length+extra.length-8);cal=cal.slice(0,Math.max(0,8-extra.length));
+  var n=cal.length+extra.length;
+  var h='<section class="card wk"><h2>이번 주 할 일 <small>'+dShort(t)+' ~ '+dShort(t7)+'</small></h2>';
+  if(!n)h+='<p class="muted" style="margin:0">이번 주 기한인 일이 없습니다. 다음 달 일정은 업무달력에서 미리 보세요.</p>';
+  else h+='<ul class="chk">'+extra.map(function(x){return '<li class="'+(x.warn?'warn':'')+'" style="align-items:flex-start;gap:.6rem;flex-wrap:wrap"><b>'+(x.warn?'!':'·')+'</b><span style="flex:1;min-width:12rem"><b>'+esc(x.t)+'</b><br><small class="muted">'+esc(x.sub)+'</small></span><span class="row" style="gap:.3rem;flex:none;margin-left:auto">'+x.btn+'</span></li>';}).join('')+
+    cal.map(function(x){return calRow(x,false);}).join('')+'</ul>'+(more?'<p class="muted" style="margin:.4rem 0 0">외 '+more+'개는 업무달력에서 보세요.</p>':'');
+  h+='<p style="margin:.7rem 0 0"><span class="tag soon">지난 기한 '+B.late.length+'</span> <span class="tag on">이번 달 '+B.now.length+'</span> <span class="tag link">30일 안 '+B.soon.length+'</span> <button type="button" class="btn ghost sm" data-go="cal" style="margin-left:.3rem">업무달력 전체 보기</button></p></section>';
+  return h;
+}
+function dShort(iso){var p=parseIso(iso);return p?p.m+'. '+p.d+'.':'';}
+
+/* ── 예시 단지 ── */
+function demoState(){
+  var y=new Date().getFullYear(),t=calToday(),nm=CAL.addM(t,1).slice(0,8)+'15';
+  var s=defaultState();
+  s.complex={name:'구연마을아파트(예시)',council:'입주자대표회의',units:'480',director:'홍길동',region:'경기도'};
+  s.committee=[{d:'1',r:'회장',n:'김하나'},{d:'2',r:'감사',n:'이두리'},{d:'3',r:'총무이사',n:'박세나'},{d:'4',r:'이사',n:'최네오'}];
+  s.meeting.date=nm;s.meeting.noticeDate=addDays(nm,-7);s.meeting.place='관리사무소 회의실';
+  s.agendas=[{title:(y+1)+'년 경비용역 사업자 선정 방법 결정의 건',result:'가결',discuss:'계약 만료(12. 31.)에 따라 제한경쟁입찰(적격심사제)로 선정하기로 함.',resolution:'참석 위원 전원 찬성으로 가결'},
+    {title:'장기수선계획 정기검토(조정)의 건',result:'가결',discuss:'3년 주기 정기검토 도래. 승강기·급수펌프 수선 시기 조정안 설명.',resolution:'원안 가결'}];
+  s.cal=merge(calDefault(),{have:{elev:true,play:true,tank:true,septic:false,fireFull:true,disinf:true},fireMonth:'6',elevYear:'2003',last:{elev:CAL.addM(t,-10),play:(y-1)+'-05-20',water:CAL.addM(t,-5),septic:'',risk:(y)+'-02-10'},since:t.slice(0,8)+'01',
+    cons:[{k:'경비',t:'경비용역',co:'(예시)든든경비',st:(y-1)+'-01-01',ed:y+'-12-31',amt:0},{k:'청소',t:'청소용역',co:'(예시)반짝청소',st:(y-1)+'-01-01',ed:(y+1)+'-02-28',amt:0},{k:'승강기',t:'승강기 유지보수',co:'(예시)오름엘리베이터',st:(y-2)+'-04-01',ed:(y+1)+'-03-31',amt:0}],conAt:t});
+  s.ltm=merge(ltmDefault(),{meta:{use:'2003-06-30',review:(y-2)+'-03',area:'42000',units:'480',bal:'850000000',balDate:CAL.addM(t,-2).slice(0,7),rates:[{from:String(y-2),to:String(y+4),u:'280'}],intr:'1',esc:'0',priceY:String(y-2),done:false,end:String(y+22),types:[{a:'',n:''}],one:'',yr:''},
+    items:[['외벽','페인트칠','전면',100,'건물외부',y+1,420000000],['지붕','방수','전면',100,'건물외부',y+3,180000000],['승강기','기계장치','전면',100,'전기·소화·승강기',y+2,360000000],['급수설비','급수펌프','전면',100,'급수·가스·배수',y,45000000],
+      ['소화설비','소화펌프','전면',100,'전기·소화·승강기',y+4,60000000],['변전설비','변압기','전면',100,'전기·소화·승강기',y+6,90000000],['자동화재감지설비','감지기','부분',30,'전기·소화·승강기',y+1,25000000],['보안·방범시설','영상정보처리기기 및 침입탐지시설','전면',100,'전기·소화·승강기',y,38000000],
+      ['어린이놀이시설','어린이놀이시설','전면',100,'옥외 부대시설',y+5,70000000],['급수설비','저수조(STS, 합성수지)','전면',100,'급수·가스·배수',y+8,80000000]].map(function(r,i){return {id:'d'+i,y:r[5],m:r[2]==='부분'?'부분':'전면',p:r[3],n:r[1],g:r[0],loc:r[4],spec:'',q:'',u:'',a:r[6]};})});
+  s.sys={data:SYS.norm({kind:'guyeon-sys',v:1,name:'구연마을아파트(예시)',src:'예시 자료(가상의 단지)',bldg:[{t:'101동',fl:15,b:1},{t:'102동',fl:15,b:1},{t:'103동',fl:12,b:1}],sys:[
+    {id:'water',t:'급수',story:'수돗물이 지하 저수조(스테인리스)에 모였다가 부스터 펌프가 압력을 만들어 각 동 세대로 바로 보냅니다. 옥상 물탱크가 없는 방식입니다.',nodes:[
+      {id:'w1',t:'상수도 인입',k:'src',spec:'100mm',fl:'G',loc:'옥외'},{id:'w2',t:'정수위조절밸브',k:'valve',spec:'80mm',fl:'B',loc:'지하 기계실',ltm:'밸브'},
+      {id:'w3',t:'지하 저수조',k:'tank',spec:'STS 조립식 · 120톤',qty:'2칸',fl:'B',loc:'지하 기계실',check:'반기 청소, 월 위생점검',ltm:'저수조'},
+      {id:'w4',t:'부스터 급수펌프',k:'pump',spec:'인버터 부스터 · 3대 병렬 · 600LPM · 70m · 15HP · 3상 380V',qty:'3대(1대 예비)',fl:'B',loc:'지하 기계실',ltm:'급수펌프'},
+      {id:'w5',t:'세대',k:'use',bd:'각 동',fl:'ALL',loc:'각 동'}],links:[{a:'w1',b:'w2'},{a:'w2',b:'w3'},{a:'w3',b:'w4'},{a:'w4',b:'w5',t:'가압 급수'}]},
+    {id:'fire',t:'소화',story:'소화수는 지하 저수조에서 씁니다. 평소엔 충압펌프가 압력을 유지하고, 소화전을 열면 주펌프가 자동으로 돕니다.',nodes:[
+      {id:'f1',t:'지하 저수조 (소화 겸용)',k:'tank',spec:'STS 조립식',fl:'B',loc:'지하 기계실',ltm:'저수조'},{id:'f2',t:'소화 주펌프',k:'pump',spec:'다단 볼류트 · 400LPM · 80m · 15HP · 3상 380V',fl:'B',loc:'지하 기계실',ltm:'소화펌프'},
+      {id:'f3',t:'충압펌프',k:'pump',spec:'웨스코 · 60LPM · 80m · 3HP',fl:'B',loc:'지하 기계실',ltm:'소화펌프'},{id:'f4',t:'압력탱크',k:'valve',spec:'100L',fl:'B',loc:'지하 기계실'},
+      {id:'f5',t:'옥내소화전',k:'use',bd:'각 동',fl:'ALL',loc:'각 동 각 층',ltm:'소화전'},{id:'f6',t:'송수구',k:'src',fl:'G',loc:'옥외'}],links:[{a:'f1',b:'f2'},{a:'f1',b:'f3'},{a:'f4',b:'f2',t:'압력 저하→기동'},{a:'f2',b:'f5'},{a:'f3',b:'f5',t:'압력 유지'},{a:'f6',b:'f5',t:'소방차 송수'}]},
+    {id:'elec',t:'전기',story:'한전 22.9kV를 받아 몰드 변압기에서 낮춰 각 동으로 보냅니다. 정전되면 비상발전기가 소방펌프·승강기에 전기를 넣습니다.',nodes:[
+      {id:'e1',t:'수전반',k:'panel',spec:'LBS·LA·PF·MOF·VCB',fl:'B',loc:'지하 전기실',ltm:'수전반'},{id:'e2',t:'변압기',k:'tr',spec:'750kVA 몰드식 · 22.9kV → 380/220V',fl:'B',loc:'지하 전기실',ltm:'변압기'},
+      {id:'e3',t:'저압반',k:'panel',fl:'B',loc:'지하 전기실',ltm:'배전반'},{id:'e4',t:'비상발전기',k:'gen',spec:'300kW',fl:'B',loc:'지하 발전기실',ltm:'발전기'},{id:'e5',t:'자동절환스위치 (ATS)',k:'valve',fl:'B',loc:'지하 전기실'},
+      {id:'e6',t:'세대·공용 전기',k:'use',bd:'각 동',fl:'ALL'}],links:[{a:'e1',b:'e2'},{a:'e2',b:'e3'},{a:'e3',b:'e6'},{a:'e3',b:'e5',t:'평상시'},{a:'e4',b:'e5',t:'정전 시'}]}]}),ui:{s:'',sel:'',edit:false}};
+  s.ui.setup={hide:1};s.ui.bk=t;
+  return s;
+}
+function demoStart(){
+  saveNow();try{sessionStorage.setItem('guyeon-demo','1');}catch(e){toast('이 브라우저에서는 예시 단지를 열 수 없습니다.');return;}
+  sys3dStop();state=demoState();try{localStorage.setItem(DEMO_KEY,JSON.stringify(state));}catch(e){}
+  demoBar();updateChip();go('home');toast('예시 단지를 열었습니다. 메뉴를 마음껏 눌러 보세요.');
+}
+function demoEnd(){
+  try{sessionStorage.removeItem('guyeon-demo');localStorage.removeItem(DEMO_KEY);}catch(e){}
+  sys3dStop();state=load();applyFont();paintFont();demoBar();updateChip();go('home');toast('예시 단지를 닫고 내 자료로 돌아왔습니다.');
+}
+function demoBar(){var b=$('#demobar');if(!b)return;b.hidden=!isDemo();}
+
+function hmAct(act,a){
+  if(act==='hmpull'){setupPull();return true;}
+  if(act==='hmcalset'){CQ().ui.v='set';saveNow();go('cal');return true;}
+  if(act==='hmcalok'){SU().cal=calToday();saveNow();var y=window.scrollY;go('home',true);window.scrollTo(0,y);toast('업무달력에 반영했습니다.');return true;}
+  if(act==='hmsethide'){SU().hide=1;saveNow();go('home',true);return true;}
+  if(act==='hmsetshow'){SU().hide=0;saveNow();go('home',true);return true;}
+  if(act==='hmdemo'){demoStart();return true;}
+  if(act==='hmdemoend'){demoEnd();return true;}
+  if(act==='hmafconn'){afConnect();return true;}
+  if(act==='hmafopen'){afOpen();return true;}
+  if(act==='hmafallow'){afAllow();return true;}
+  if(act==='hmafuse'){afUseFile();return true;}
+  if(act==='hmafkeep'){afKeepLocal();return true;}
+  if(act==='hmafoff'){afOff();return true;}
+  return false;
+}
+
 /* ═════════ 설비 계통도 ═════════ */
 function sysDefault(){return {data:null,ui:{s:'',sel:'',edit:false}};}
 function SQ(){if(!state.sys||!state.sys.ui)state.sys=merge(sysDefault(),state.sys||{});return state.sys;}
@@ -6588,6 +6822,7 @@ function onInput(e){
   if(el.dataset&&el.dataset.sui!==undefined){var bq=BQ(),n=+el.dataset.sui,arr=(bq.sui||[]).map(Number).filter(function(x){return x!==n;});if(el.checked)arr.push(n);bq.sui=arr.sort(function(x,y){return x-y;});save();refreshBid();return;}
   var b=el.getAttribute&&el.getAttribute('data-bind');if(!b)return;
   setPath(state,b,el.type==='checkbox'?el.checked:el.value);save();
+  if(el.type!=='checkbox')$$('[data-bind="'+b+'"]').forEach(function(x){if(x!==el&&x.type!=='checkbox'&&x.value!==el.value)x.value=el.value;});
   if(tab==='elect'&&b.indexOf('elect.')===0){if(/^elect\.rows\./.test(b))eSum();refreshElect();return;}
   if(tab==='bid'&&/^bids\.\d+\./.test(b)){var bk=b.replace(/^bids\.\d+\./,'');if(/^cos\./.test(bk)){scCells();return;}if(bk==='kind'){var bq=BQ(),kk=BD.kind(bq.kind);bq.award='';bq.eval=evalDefault(bq.kind);bq.sui=(bq.sui||[]).filter(function(n){return !BD.suiFit(+n,kk,0)||+n===6;});}
     if(/^(kind|path|amtMode|site|type|award|pt\.on)$/.test(bk)){var y=window.scrollY;renderBid($('#view'));window.scrollTo(0,y);}else{refreshBid();}return;}
@@ -6630,6 +6865,7 @@ function onClick(e){
   if(act.indexOf('lt')===0&&ltAct(act,a))return;
   if(act.indexOf('cal')===0&&calAct(act,a))return;
   if(act.indexOf('sys')===0&&sysAct(act,a))return;
+  if(act.indexOf('hm')===0&&hmAct(act,a))return;
   if(act==='addag'){state.agendas.push({title:'',result:'가결',discuss:'',resolution:''});save();renderAgList();refreshPreview();var inp=$$('#aglist .ag-h input');if(inp.length)inp[inp.length-1].focus();}
   else if(act==='agdel'){state.agendas.splice(i,1);save();renderAgList();refreshPreview();}
   else if(act==='agup'&&i>0){var t=state.agendas[i];state.agendas[i]=state.agendas[i-1];state.agendas[i-1]=t;save();renderAgList();refreshPreview();}
@@ -6674,6 +6910,7 @@ function onImport(e){
 
 /* ───────── 시작 ───────── */
 applyFont();shell();
+demoBar();afInit();
 var h0=(location.hash||'').replace('#','');
 go(h0||'home',true);
 window.addEventListener('hashchange',function(){var x=(location.hash||'').replace('#','');if(x&&x!==tab)go(x,true);});
