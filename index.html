@@ -2215,7 +2215,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.25.0';
+var APP_VER='1.25.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -3126,13 +3126,13 @@ function renderSafety(v){
     '<p class="muted" style="margin:.7rem 0 .2rem"><span class="legend"></span> 고친 칸 <b id="sp-n">'+nEd+'</b>개</p>'+
     '<p class="muted" style="margin:.2rem 0 0">단지명과 관리소장 성명은 홈의 단지 정보에서 자동으로 들어갑니다. 점검일처럼 기록이 필요한 칸은 실제 기록만 넣고, 모르는 칸은 비워 두세요.</p>'+
     verMsg+
-    '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem"><b style="font-size:.88rem">AI에게 맡기기</b>'+
-      '<p class="muted" style="margin:.3rem 0 .5rem">빈칸 목록을 Claude나 제미나이에 주고, 기존 계획서 PDF나 점검 기록을 같이 올려 채워 달라고 하세요.</p>'+
-      '<div class="row"><button type="button" class="btn sm" data-act="aicopy">① 부탁 문장 복사</button><button type="button" class="btn ghost sm" data-act="aitxt">파일로 저장</button></div>'+
-      '<div class="row" style="margin-top:.4rem"><button type="button" class="btn sm" data-act="aiopen">② AI 결과 넣기</button></div></div>'+
+    '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem"><b style="font-size:.88rem">AI로 쉽게 채우기</b>'+
+      '<p class="muted" style="margin:.3rem 0 .5rem">자료를 폴더에 넣고 Claude에 맡기는 3단계 안내가 오른쪽 계획서 바로 위에 있습니다.</p>'+
+      '<button type="button" class="btn sm" data-act="spwizgo">3단계 안내 열기 ↑</button></div>'+
     '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem"><b style="font-size:.85rem">목차</b><nav class="toc" id="sptoc">'+spToc()+'</nav></div>'+
     '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem" id="sp-reset"><button type="button" class="btn danger sm" data-act="spreset">고친 내용 되돌리기</button></div>'+
   '</aside><div style="min-width:0">'+spWizHtml()+'<section class="card" id="aipanel" hidden style="margin-bottom:1rem"></section><article class="doc docv" id="spdoc">'+(SPT.length?blocksHtml(SPT,{edit:1,edits:state.safety.edits}):'<p>양식을 불러오지 못했습니다.</p>')+'</article></div></div>';
+  var wd=$('#spwizd');if(wd)wd.addEventListener('toggle',function(){state.safety.wiz=wd.open?'open':'closed';save();});
   var spf=$('#sp-file');if(spf)spf.onchange=function(){var f=spf.files&&spf.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){var t=String(rd.result||'');if(!/#구연-채우기/.test(t)&&!/^\s*\d+(\.\d+\.\d+)?\s*=/m.test(t)){var m=$('#aimsg2');if(m)m.textContent='이 파일은 채우기 결과 파일이 아닌 것 같습니다. "안전관리계획_채우기.txt"를 골라 주세요.';return;}spApplyShow(t,true);};rd.readAsText(f,'utf-8');};
 }
 function spBase(key){
@@ -3251,8 +3251,8 @@ function spFolderPrompt(){
 }
 function spWizHtml(){
   var h=state.safety.have||{},n=0,tot=0;SP_DOCS.forEach(function(g){g[1].forEach(function(d){tot++;if(h[d[0]])n++;});});
-  var open=Object.keys(state.safety.edits).length<30;
-  return '<section class="card sp-wiz"><details'+(open?' open':'')+'><summary style="cursor:pointer"><h2 style="display:inline">AI로 쉽게 채우기 <small>자료만 모으면 AI가 칸을 채웁니다 · 3단계</small></h2></summary>'+
+  var open=state.safety.wiz!=='closed';
+  return '<section class="card sp-wiz" id="spwiz"><details id="spwizd"'+(open?' open':'')+'><summary style="cursor:pointer"><h2 style="display:inline">AI로 쉽게 채우기 <small>자료만 모으면 AI가 칸을 채웁니다 · 3단계</small></h2></summary>'+
     '<div class="sp-step"><b class="sp-n">1</b><div><b>가지고 있는 자료에 체크하세요</b> <small class="muted">없는 자료는 빼고 진행해도 됩니다. 사진이나 PDF면 충분합니다.</small>'+
       SP_DOCS.map(function(g){return '<div class="sp-grp"><span class="sp-gt">'+g[0]+'</span>'+g[1].map(function(d){return '<label class="sp-ck"><input type="checkbox" data-bind="safety.have.'+d[0]+'"'+(h[d[0]]?' checked':'')+'> '+esc(d[1])+'</label>';}).join('')+'</div>';}).join('')+
       '<label class="f" style="margin-top:.5rem"><span>현장에서 확인한 내용 (선택)</span><textarea data-bind="safety.memo" rows="3" placeholder="예: 보일러실 없음(개별난방). 주민운동시설 1곳(관리동 2층). 지하주차장 차수판 2곳. 도면의 경비실 1곳은 철거됨.">'+esc(state.safety.memo||'')+'</textarea><em>도면이나 옛 계획서와 현장이 다른 점을 적어 두면 AI가 현장 기준으로 채웁니다.</em></label></div></div>'+
@@ -7098,6 +7098,7 @@ function onClick(e){
   else if(act==='aiclose'){aiPanel(false);}
   else if(act==='aiapply2'){spApplyShow(($('#aitext2')||{}).value||'',false);}
   else if(act==='spfile'){var fi=$('#sp-file');if(fi){fi.value='';fi.click();}}
+  else if(act==='spwizgo'){var d=$('#spwizd');if(d){d.open=true;state.safety.wiz='open';save();}var w=$('#spwiz');if(w){var tp=document.querySelector('.top'),y=w.getBoundingClientRect().top+window.scrollY-(tp?tp.getBoundingClientRect().bottom:0)-10;window.scrollTo({top:y,behavior:'smooth'});}}
   else if(act==='spfolder'){copyText(spFolderPrompt(),'복사했습니다. 폴더를 연결한 Claude 대화창에 붙여넣으세요.');}
   else if(act==='spprep'){saveFile('안전관리계획_준비물_목록.txt',new Blob([spPrepText()],{type:'text/plain'}));}
   else if(act==='aiapply'){var tx=$('#aitext').value;var r=aiApply(tx);
