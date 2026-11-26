@@ -1536,6 +1536,7 @@ var CAL = (function () {
     if (/TV|티비|광고|모니터|미디어보드|전광판/i.test(raw)) return (c2 || '') + ':광고:' + raw.replace(/\s+/g, '').replace(/(업체선정|업체|선정|계약)/g, '').slice(0, 8);
     var t = String(x[0] || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, '').replace(/^아파트/, '')
       .replace(/(업체선정|업체|계약서|계약|선정|변경|수정|재계약|서비스|용역|최저임금인상|도급비)/g, '');
+    if (c3 === '13' && /수목|나무|조경|전정/.test(raw)) return (c2 || '') + ':13:수목';
     if (/^(12|15|16)$/.test(c3 || '') || !c3) return (c2 || '') + ':' + t.slice(0, 6);
     return (c2 || '') + ':' + c3;
   }
@@ -1573,11 +1574,25 @@ var CAL = (function () {
     return out;
   }
   function rl(a) { a = String(a || '직접 입력'); return /^관리규약/.test(a) ? a : '관리규약 ' + a; }
+  var AD = /TV|티비|광고|모니터|미디어보드|전광판/i;
+  function isAd(o) { return /:광고:/.test(o.k || '') || AD.test(o.t || ''); }
+  function isIns(o) { return /보험/.test(o.t || ''); }
   function conSteps(o, rule) {
-    var L = [], R = rule || {};
-    if (!/:광고:/.test(o.k || '') && !o.mgr && R.biz && R.biz.d) {
+    var L = [], R = rule || {}, ad = isAd(o);
+    if (!o.mgr && isIns(o)) {
+      L.push({ due: addD(o.ed, -60), t: '보험 갱신 — 견적 비교 후 입대의 의결', how: '보험계약은 경쟁입찰 없이 수의계약할 수 있습니다(선정지침 별표 2 제1호). 여러 보험사 견적을 받아 비교하고 입대의 의결 후 가입합니다. (준비 일정은 실무 권장)', law: '선정지침 별표 2 제1호' });
+      L.push({ due: addD(o.ed, -7), t: '보험 가입(갱신) 완료 — 보장 공백 없게', how: '만료일 전에 새 증권을 받아 둡니다. 계약서 공개는 체결 후 1개월 안에(법 제28조).', law: '법 제28조' });
+      L.push({ due: o.ed, t: '보험 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
+      return L;
+    }
+    if (!o.mgr && /회계감사|외부감사|감사인/.test(o.t || '')) {
+      L.push({ due: addD(o.ed, -90), t: '다음 회계감사 감사인 선정 — 입대의가 선정', how: '회계감사의 감사인은 입주자대표회의가 선정합니다. 시장·군수·구청장이나 한국공인회계사회에 추천을 의뢰할 수 있고, 입주자등 10분의 1 이상이 연서해 요구하면 추천을 받은 사람 중에서 골라야 합니다(법 제26조제4항). 관리주체가 하는 기존 사업자 재계약 절차와는 다릅니다. (준비 일정은 실무 권장)', law: '법 제26조제4항' });
+      L.push({ due: o.ed, t: '계약 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
+      return L;
+    }
+    if (!o.mgr && R.biz && R.biz.d) {
       var b = R.biz, due = addD(o.ed, -b.d), pe = b.post ? addD(due, b.post) : due, small = o.amt > 0 && o.amt <= 5000000;
-      L.push({ due: addD(due, -15), t: '사업수행실적 평가 시작 — 기존 사업자와 재계약하려면', how: '관리규약의 평가표 서식으로 평가합니다. 평가 마감(' + due + ')보다 넉넉히 시작합니다(실무 권장).' + (small ? ' 500만원(부가세 제외) 이하이면 2인 이상 견적서로 수의계약하는 길도 있습니다(선정지침 별표 2 제6호).' : ''), law: '' });
+      L.push({ due: addD(due, -15), t: '사업수행실적 평가 시작 — 기존 사업자와 재계약하려면', how: (ad ? '광고(잡수입)처럼 단지가 돈을 받는 계약도 기존 사업자 재계약은 같은 절차입니다. ' : '') + '관리규약의 평가표 서식으로 평가합니다. 평가 마감(' + due + ')보다 넉넉히 시작합니다(실무 권장).' + (small ? ' 500만원(부가세 제외) 이하이면 2인 이상 견적서로 수의계약하는 길도 있습니다(선정지침 별표 2 제6호).' : ''), law: '' });
       L.push({ due: due, t: '사업수행실적 평가 마감' + (b.score ? ' — ' + b.score + '점 이상이면 평가서 게시 시작' : ''), how: (b.txt || '계약만료 ' + b.d + '일 전까지 평가') + ' (선정지침 별표 2 제9호에 따른 재계약)', law: rl(b.art), rule: 1 });
       if (b.post) L.push({ due: pe, t: '평가서 게시 ' + b.post + '일 끝 — 이의신청 집계', how: '이의신청이 ' + (b.frac || '규약에서 정한 비율') + ' 미만이면 입대의 의결로 재계약, 그 이상이거나 의결을 못 받으면 경쟁입찰로 바꿉니다.', law: rl(b.art), rule: 1 });
       L.push({ due: pe, t: '입대의 의결 (재계약) 또는 경쟁입찰 전환', how: '의결 결과를 회의록에 남깁니다.', law: rl(b.art), rule: 1 });
@@ -1599,12 +1614,10 @@ var CAL = (function () {
       L.push({ due: addD(o.ed, -150), t: '재선정 방법 정하기 — 입대의 의결로 제안', how: '주택관리업자는 입찰이든 재계약(수의계약)이든 입대의 의결로 제안하고 전체 입주자등 과반수 동의를 받아야 합니다(선정지침 제4조제4항·제5항 단서). 동의 기간까지 넉넉히 잡습니다.', law: '선정지침 제4조' });
       L.push({ due: addD(o.ed, -90), t: '입주자등 동의 받기 / 입찰공고', how: '입찰이면 마감일 전일부터 10일 전까지 공고(제15조).', law: '선정지침 제4조·제15조' });
     } else {
-      if (/:광고:/.test(o.k)) {
-        L.push({ due: addD(o.ed, -60), t: '광고(잡수입) 계약 — 연장할지 새 업체를 고를지 정하기', how: '승강기 TV·게시판 광고처럼 단지가 돈을 받는 계약입니다. 연장·재선정 방법은 관리규약과 입찰·계약 메뉴에서 확인하고 입대의에 보고합니다. (준비 일정은 실무 권장)', law: '' });
-        L.push({ due: o.ed, t: '계약 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
-        return L;
-      }
-      var small = o.amt > 0 && o.amt <= 5000000;
+      var small = !ad && o.amt > 0 && o.amt <= 5000000, septic = /정화조/.test(o.t || '');
+      if (ad) L.push({ due: addD(o.ed, -90), t: '광고(잡수입) 계약 — 재계약할지 입찰할지 정하기', how: '승강기 TV·게시판 광고처럼 단지가 돈을 받는 계약입니다. 기존 사업자와 재계약하려면 관리규약 절차에 따라 사업수행실적을 평가하고 입대의가 의결합니다(선정지침 별표 2 제9호). 입찰이면 최고가 낙찰 등 방법을 공고 전에 의결합니다.', law: '선정지침 별표 2 제9호' });
+      else if (septic) L.push({ due: addD(o.ed, -90), t: '다음 계약 방법 정하기 — 정화조 청소는 수수료가 정해져 있어 수의계약 가능', how: '분뇨 수집·운반(정화조 청소 포함)처럼 자치법규로 수수료를 정한 경우 수의계약할 수 있습니다(선정지침 별표 2 제3호). 구청 고시 수수료를 확인하고 입대의 의결.', law: '선정지침 별표 2 제3호' });
+      else
       L.push({ due: addD(o.ed, -90), t: small ? '다음 계약 방법 정하기 — 500만원 이하면 견적 2곳으로 수의계약 가능' : '재계약할지 입찰할지 정하기 — 사업수행실적 평가·입대의 의결',
         how: (small ? 'K-apt 금액이 ' + o.amt.toLocaleString('ko-KR') + '원이라 500만원(부가세 제외) 이하이면 2인 이상 견적서로 수의계약할 수 있습니다(별표 2 제6호, 나눠 계약 금지). 기존 사업자와 실적 평가로 재계약하려면 입대의 의결(제4조제5항). ' : '기존 사업자와 재계약(수의계약)하려면 별표 2 해당 여부와 실적 평가를 거쳐 계약 전에 입대의 의결(제4조제5항). ') + '입찰이면 입찰 방법·낙찰 방법 등을 공고 전에 의결(제4조제4항).', law: '선정지침 제4조' + (small ? '·별표 2' : '') });
       L.push({ due: addD(o.ed, -60), t: '입찰공고 또는 재계약 절차 진행', how: '입찰공고는 마감일 전일부터 10일 전까지(긴급·재공고는 5일), 현장설명회를 하면 설명회 전일부터 5일 전까지(제23조).', law: '선정지침 제23조' });
@@ -2196,7 +2209,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.22.0';
+var APP_VER='1.23.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2209,7 +2222,7 @@ function defaultState(){
     risk:{url:'',key:''},
     cal:calDefault(),
     sys:sysDefault(),
-    kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:''},
+    kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:'',key:''},
     safety:{ver:SP_VER,edits:{}},
     rules:rulesDefault(),
     bids:[bidDefault()],bidCur:0,
@@ -2999,7 +3012,9 @@ function renderHome(v){
     '<div style="margin-top:.9rem;border-top:1px solid var(--line);padding-top:.8rem"><b style="font-size:.9rem">K-apt에서 불러오기</b>'+
       '<p class="muted" style="margin:.2rem 0 .5rem">K-apt 단지코드를 넣으면 주소, 사용검사일, 동수, 주차·승강기·CCTV 대수 등을 가져와 단지 정보와 안전관리계획서에 넣습니다. 단지코드는 K-apt 단지 기본정보 화면에서 확인할 수 있습니다.</p>'+
       '<div class="row" style="align-items:flex-end"><label class="f" style="flex:1;min-width:10rem"><span>K-apt 단지코드</span><input type="text" data-bind="kapt.code" id="f-kapt-code" value="'+esc(state.kapt.code)+'" placeholder="예: A12345678"></label><button type="button" class="btn" data-act="kaptget">불러오기</button></div>'+
-      '<details style="margin-top:.5rem"><summary class="muted" style="cursor:pointer">연결 설정</summary>'+F('K-apt 통로 서버 주소','kapt.api',state.kapt.api,{type:'url'})+'</details>'+
+      '<details style="margin-top:.5rem"><summary class="muted" style="cursor:pointer">연결 설정</summary>'+F('K-apt 통로 서버 주소','kapt.api',state.kapt.api,{type:'url'})+
+        F('통로 열쇠','kapt.key',state.kapt.key||'',{type:'password',hint:'통로 서버를 잠갔을 때 필요합니다. 사이트 소스에는 들어가지 않고 이 컴퓨터 브라우저에만 저장됩니다. 남에게 보내지 마세요.'})+
+        '<div class="row" style="margin-top:.3rem"><button type="button" class="btn ghost sm" data-act="hmkeygen">새 열쇠 만들기</button><button type="button" class="btn ghost sm" data-act="hmkeyshow">열쇠 보기·복사</button></div><div id="hm-keymsg" class="muted" style="margin-top:.3rem;font-size:.85rem"></div></details>'+
       '<div id="kaptres" style="margin-top:.6rem"></div></div>'+
     '</section>'+
     '<section class="card"><h2>위원 명단 <small>회의록 서명란에 들어갑니다</small></h2>'+
@@ -4728,6 +4743,8 @@ function bidChecks(J,S){
 }
 /* K-apt 연동 */
 function kapiBase(){return String(state.kapt.api||'').trim().replace(/\/+$/,'');}
+/* 통로 서버에 갈 때만 '통로 열쇠'를 붙인다. 열쇠는 이 브라우저에만 있고 사이트 소스에는 없다. */
+(function(){var f0=window.fetch;if(!f0)return;window.fetch=function(u,o){try{var b=String((state.kapt||{}).api||'').trim().replace(/\/+$/,''),k=String((state.kapt||{}).key||'').trim();if(k&&b&&typeof u==='string'&&u.indexOf(b+'/')===0){o=Object.assign({},o||{});o.headers=Object.assign({},o.headers||{},{'X-Hub-Key':k});}}catch(e){}return f0.call(window,u,o);};})();
 function kcode(){return String(state.kapt.code||'').trim().toUpperCase();}
 function bdKapt(){
   var msg=$('#bd-kmsg'),code=kcode();
@@ -5216,7 +5233,7 @@ function calLinks(){
     var con=(S.rows.filter(function(r){return r.k==='con';})[0]||{}).d||b.conDate;
     if(con&&/^\d{4}-\d\d-\d\d$/.test(con))L.push({t:nm+': 계약서 공개 (홈페이지·동별 게시판)',due:CAL.addM(con,1),src:'입찰·계약',law:'공동주택관리법 제28조',how:'계약 체결일부터 1개월 이내, 개인정보는 가리고'});
   }catch(e){}
-  try{var c=CQ(),t0=calToday();(c.cons||[]).forEach(function(o){if(c.conOff[o.k]||o.ed<t0)return;CAL.conSteps(o,calRule()).forEach(function(st){L.push({t:o.t+': '+st.t,due:st.due,src:'계약 만료',law:st.law,how:st.how+(st.rule||!st.law?'':' (준비 일정은 실무 권장)')});});});}catch(e){}
+  try{var c=CQ(),t0=calToday();(c.cons||[]).forEach(function(o0){var o=calConEff(o0);if(c.conOff[o.k]||o.ed<t0)return;CAL.conSteps(o,calRule()).forEach(function(st){L.push({t:o.t+(o.co?' ('+o.co+')':'')+': '+st.t,due:st.due,src:'계약 만료',law:st.law,how:st.how+(st.rule||!st.law?'':' (준비 일정은 실무 권장)')});});});}catch(e){}
   try{var S2=eSched();S2.rows.forEach(function(r){if(r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)&&/notice|vote|result|cm$/.test(r.k))L.push({t:'선거: '+r.t,due:r.d,src:'선거',law:r.law,how:r.note});});}catch(e){}
   return L;
 }
@@ -5249,7 +5266,9 @@ function renderCal(v){
     '<div id="calv"></div>';
   calPaint();
 }
+var calConAuto=false;
 function calPaint(){
+  try{var cq=CQ();if(!calConAuto&&(cq.cons||[]).length&&cq.conV!==2&&/^A\d{8}$/.test(kcode())){calConAuto=true;setTimeout(calConPull,50);}}catch(e){}
   var c=CQ(),v=c.ui.v||'now',box=$('#calv');if(!box)return;
   $$('#caltabs button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.calv===v));});
   if(v==='set'){box.innerHTML=calSetHtml();return;}
@@ -5337,15 +5356,18 @@ function calRuleHtml(){
     return h+'</div>';};
   return '<section class="card"><h2>우리 관리규약 기한 <small>재계약 일정에 씁니다</small></h2><p class="muted" style="margin:0 0 .6rem">관리규약이 정한 재계약 기한이 있으면 그 날짜로 일정을 잡습니다. 규약에서 찾은 숫자는 확인을 누른 뒤에만 씁니다. 규약 기준을 쓰지 않는 계약은 실무 권장 일정(만료 90·60·30일 전)으로 잡습니다.</p>'+row('biz')+row('mgr')+'</section>';
 }
+function calConEff(o){var c=CQ(),e=c.conEd&&c.conEd[o.k];return e&&/^\d{4}-\d\d-\d\d$/.test(e)?Object.assign({},o,{ed:e,edFix:o.ed}):o;}
 function calConHtml(){
-  var c=CQ(),t=calToday(),L=c.cons||[];
+  var c=CQ(),t=calToday(),L=(c.cons||[]).map(calConEff);
   var h='<section class="card"><h2>용역·관리 계약 만료 <small>K-apt 계약 공지에서 가져옴</small></h2>'+
     '<p class="muted" style="margin:0 0 .6rem">K-apt에 공개된 수의계약 공지에서 경비·청소·승강기·소독·보험처럼 계속 이어지는 계약만 골라 갈래별 가장 최근 계약의 만료일을 봅니다. 공사·물품처럼 한 번으로 끝나는 계약은 뺍니다. 고른 계약은 만료일에서 거꾸로 잡은 준비 일정이 "할 일"에 들어갑니다.</p>'+
     '<div class="row"><button type="button" class="btn" data-act="calcon">K-apt 계약 공지 불러오기</button>'+(c.conAt?'<span class="muted">'+esc(c.conAt)+' 불러옴 · '+L.length+'건</span>':'')+'</div><div id="cal-conmsg" class="muted" style="margin-top:.4rem"></div>';
   if(L.length){
-    h+='<div style="overflow-x:auto;margin-top:.8rem"><table class="kt"><thead><tr><th>달력</th><th>계약</th><th>기간</th><th>만료까지</th></tr></thead><tbody>'+L.map(function(o){
+    h+='<div style="overflow-x:auto;margin-top:.8rem"><table class="kt"><thead><tr><th title="체크를 끄면 달력에서 뺍니다 (이미 없는 계약)">달력</th><th>계약</th><th>기간</th><th>만료까지</th></tr></thead><tbody>'+L.map(function(o){
       var d=Math.round((parseIso(o.ed).t-parseIso(t).t)/864e5),tag=d<0?'<span class="tag soon">만료 지남 '+(-d)+'일</span>':d<=120?'<span class="tag soon">D-'+d+'</span>':'<span class="tag link">D-'+d+'</span>';
       return '<tr><td><input type="checkbox" data-act="calconon" data-k="'+esc(o.k)+'"'+(c.conOff[o.k]?'':' checked')+' aria-label="달력에 넣기" style="width:auto"></td><td><b>'+esc(o.t)+'</b>'+(o.mgr?' <span class="tag on">주택관리업자</span>':'')+'<br><small class="muted">'+esc(o.co)+(o.amt?' · '+o.amt.toLocaleString('ko-KR')+'원':'')+'</small>'+
+        (o.edFix?'<br><small class="note">만료일을 직접 고침 (K-apt: '+esc(o.edFix)+')</small>':'')+
+        '<details style="margin-top:.2rem"><summary class="muted" style="cursor:pointer;font-size:.82rem">실제와 다르면 만료일 고치기</summary><div class="row" style="align-items:center;margin-top:.3rem"><input type="date" id="ce-'+esc(o.k.replace(/[^\w가-힣]/g,'_'))+'" value="'+esc(o.ed)+'" style="width:auto"><button type="button" class="btn sm" data-act="calconed" data-k="'+esc(o.k)+'">저장</button>'+(o.edFix?'<button type="button" class="btn ghost sm" data-act="calconedx" data-k="'+esc(o.k)+'">K-apt 날짜로</button>':'')+'</div><small class="muted">K-apt에 늦게 올라왔거나 중도 해지·조기 재계약한 경우에 고칩니다. 다시 불러와도 고친 날짜가 남습니다. 이미 없는 계약이면 왼쪽 "달력" 체크를 끄세요.</small></details>'+
         (d<0?'<br><small style="color:var(--warn)">K-apt에 이어지는 새 계약이 없습니다. 이미 재계약했다면 선정결과·계약 공개가 빠졌는지 확인하세요(선정지침 제11조, 법 제28조).</small>':'')+'</td><td style="white-space:nowrap"><small>'+esc(o.st)+'<br>~ '+esc(o.ed)+'</small></td><td style="white-space:nowrap">'+tag+'</td></tr>';}).join('')+'</tbody></table></div>'+
       '<p class="muted" style="margin:.5rem 0 0;font-size:.85rem">준비 일정(만료 90·60·30일 전, 주택관리업자는 150·90·30일 전)은 실무 권장입니다. 실제 입찰 일정과 법정 기한은 입찰·계약 메뉴에서 공고일을 넣으면 계산됩니다. K-apt 금액은 단지마다 월 금액 또는 총액으로 적혀 있습니다.</p>';
   }
@@ -5357,7 +5379,7 @@ function calConPull(){
   if(msg)msg.textContent='K-apt 계약 공지를 읽는 중…';
   fetch(kapiBase()+'/api/contracts?code='+code).then(function(r){return r.json();}).then(function(j){
     if(!j.ok)throw new Error(j.error||'없음');
-    var c=CQ();c.cons=CAL.conGroups(j.list,calToday());c.conAt=calToday();saveNow();calPaint();
+    var c=CQ();c.cons=CAL.conGroups(j.list,calToday());c.conAt=calToday();c.conV=2;saveNow();calPaint();
     toast('계약 공지 '+j.list.length+'건 중 계속 이어지는 계약 '+c.cons.length+'갈래를 골랐습니다.');
   }).catch(function(e){if(msg)msg.textContent=/fetch|Network|Load/i.test(String(e))?'통로 서버에 연결하지 못했습니다(GitHub 사이트에서 동작).':'가져오지 못했습니다: '+e.message;});
 }
@@ -5373,6 +5395,8 @@ function calAct(act,a){
   if(act==='calrule'){var f=calRuleFound()[a.dataset.k];if(f){c.rule=c.rule||{};c.rule[a.dataset.k]=Object.assign({},f,{ok:true});saveNow();calPaint();toast('관리규약 기준으로 재계약 일정을 다시 잡았습니다.');}return true;}
   if(act==='calruleoff'){if(c.rule)delete c.rule[a.dataset.k];saveNow();calPaint();return true;}
   if(act==='calrulemanual'){var k=a.dataset.k,d=+(($('#cr-'+k+'-d')||{}).value||0);if(!(d>0)){toast('며칠 전까지인지 숫자를 넣어 주세요.');return true;}c.rule=c.rule||{};c.rule[k]={ok:true,d:d,post:+(($('#cr-'+k+'-p')||{}).value||0),art:(($('#cr-'+k+'-a')||{}).value||'직접 입력'),txt:'',score:0,frac:''};saveNow();calPaint();toast('저장했습니다.');return true;}
+  if(act==='calconed'){var k=a.dataset.k,el=document.getElementById('ce-'+k.replace(/[^\w가-힣]/g,'_')),v=el&&el.value;if(!/^\d{4}-\d\d-\d\d$/.test(v||'')){toast('날짜를 골라 주세요.');return true;}c.conEd=c.conEd||{};c.conEd[k]=v;saveNow();calPaint();toast('만료일을 '+v+'로 고쳤습니다.');return true;}
+  if(act==='calconedx'){if(c.conEd)delete c.conEd[a.dataset.k];saveNow();calPaint();return true;}
   if(act==='calconon'){if(a.checked)delete c.conOff[a.dataset.k];else c.conOff[a.dataset.k]=1;saveNow();return true;}
   if(act==='calset'){c.ui.v='set';saveNow();calPaint();return true;}
   if(act==='calcuadd'){c.custom.push({name:'',cyc:'',last:'',law:''});saveNow();calPaint();return true;}
@@ -5518,7 +5542,7 @@ function setupPull(){
     if(kg(A,['kaptdEcnt','kaptdEcntp'])!=='')c.have.elev=ec>0;
     state.safety.ver=SP_VER;saveNow();updateChip();
     out.push('<b>단지 정보</b> '+n+'개 항목을 넣었습니다'+(m.rows.some(function(r){return r.cur&&!r.same;})?' (지금 값과 다른 항목은 건드리지 않았습니다 — 아래 단지 정보의 K-apt 불러오기에서 골라 넣으세요)':'')+'.'+(extra.length?' '+esc(extra.join(', '))+'.':''));show();
-    return J('/api/contracts?code='+code).then(function(j2){if(!j2.ok)throw 0;c.cons=CAL.conGroups(j2.list,calToday());c.conAt=calToday();saveNow();
+    return J('/api/contracts?code='+code).then(function(j2){if(!j2.ok)throw 0;c.cons=CAL.conGroups(j2.list,calToday());c.conAt=calToday();c.conV=2;saveNow();
       out.push('<b>계약 만료</b> 이어지는 계약 '+c.cons.length+'갈래를 업무달력에 넣었습니다'+(c.cons.length?' ('+c.cons.slice(0,4).map(function(o){return esc(o.t)+' ~'+esc(o.ed);}).join(', ')+(c.cons.length>4?' 외':'')+')':'')+'.');show();},function(){out.push('<b>계약 만료</b> 가져오지 못했습니다. 업무달력 → 계약 만료에서 다시 눌러 주세요.');show();});
   }).then(function(){
     return J('/api/ltm?code='+code).then(function(j3){if(!j3.ok)throw 0;var L=LQ(),f=j3.fund||{};L.kf=Object.assign({at:ltToday()},f);
@@ -5608,7 +5632,10 @@ function demoEnd(){
 }
 function demoBar(){var b=$('#demobar');if(!b)return;b.hidden=!isDemo();}
 
+function hmKeyMsg(k,isNew){var m=$('#hm-keymsg');if(!m)return;m.innerHTML=(isNew?'<b>새 열쇠를 만들어 이 컴퓨터에 넣었습니다.</b><br>':'')+'<code style="user-select:all;word-break:break-all">'+esc(k)+'</code> <button type="button" class="btn ghost sm" id="hm-keycopy">복사</button><br>Cloudflare → Workers → kapt-hub → 설정 → 변수 및 비밀 → 비밀 <b>HUB_KEYS</b>에 이 값을 넣고 배포하세요. 여러 사람이면 쉼표로 이어 붙입니다.';var c=$('#hm-keycopy');if(c)c.onclick=function(){try{navigator.clipboard.writeText(k).then(function(){toast('복사했습니다.');});}catch(e){}};}
 function hmAct(act,a){
+  if(act==='hmkeygen'){if(state.kapt.key&&!confirm('이미 열쇠가 있습니다. 새로 만들면 Cloudflare의 HUB_KEYS도 바꿔야 합니다. 새로 만들까요?'))return true;var r=new Uint8Array(18);crypto.getRandomValues(r);var k='gh_'+Array.prototype.map.call(r,function(x){return ('0'+x.toString(16)).slice(-2);}).join('');state.kapt.key=k;saveNow();var el=$('#f-kapt-key');if(el)el.value=k;hmKeyMsg(k,true);return true;}
+  if(act==='hmkeyshow'){var k2=String(state.kapt.key||'').trim();if(!k2){toast('아직 열쇠가 없습니다. "새 열쇠 만들기"를 누르세요.');return true;}hmKeyMsg(k2,false);return true;}
   if(act==='hmpull'){setupPull();return true;}
   if(act==='hmfind'){setupFind();return true;}
   if(act==='hmpick'){state.kapt.code=a.dataset.code;if(state.complex.name==='○○아파트'||!state.complex.name)state.complex.name=a.dataset.name;saveNow();updateChip();var fb=$('#hm-find');if(fb)fb.innerHTML='<p class="muted" style="margin:0">'+esc(a.dataset.name)+'('+esc(a.dataset.code)+')을 골랐습니다.</p>';setupPull();return true;}
