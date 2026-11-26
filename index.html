@@ -126,6 +126,9 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .pv-tabs button{border:1px solid var(--line);background:var(--surface);border-radius:.5rem;padding:.3rem .8rem;font-size:.85rem;cursor:pointer;color:var(--ink2)}
 .pv-tabs button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
 .lt-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.35rem;margin:1.1rem 0 .55rem;padding:0;list-style:none}
+.cr-row{border-top:1px solid var(--line);padding:.6rem 0}
+.cr-row:first-of-type{border-top:0}
+.cr-q{margin:.3rem 0 .5rem;padding:.4rem .7rem;border-left:3px solid var(--accent);background:var(--surface2);font-size:.86rem;color:var(--ink2);border-radius:0 .4rem .4rem 0}
 .demobar{background:#fff4d6;border-bottom:1px solid #e9c46a;color:#5b4300;padding:.45rem 0;font-size:.88rem}
 .demobar[hidden]{display:none}
 .su{border:2px solid var(--accent)}
@@ -1528,6 +1531,9 @@ var CAL = (function () {
   function conKey(x) {
     var c1 = x[6], c2 = x[7], c3 = x[8];
     if (c1 === '01') return '관리';
+    // 승강기 TV·광고처럼 같은 갈래 코드에 묶이는 수입(광고) 계약은 따로 본다
+    var raw = String(x[0] || '');
+    if (/TV|티비|광고|모니터|미디어보드|전광판/i.test(raw)) return (c2 || '') + ':광고:' + raw.replace(/\s+/g, '').replace(/(업체선정|업체|선정|계약)/g, '').slice(0, 8);
     var t = String(x[0] || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, '').replace(/^아파트/, '')
       .replace(/(업체선정|업체|계약서|계약|선정|변경|수정|재계약|서비스|용역|최저임금인상|도급비)/g, '');
     if (/^(12|15|16)$/.test(c3 || '') || !c3) return (c2 || '') + ':' + t.slice(0, 6);
@@ -1547,13 +1553,60 @@ var CAL = (function () {
     return Object.keys(G).map(function (k) { return G[k]; }).filter(function (o) { return !today || o.ed >= addM(today, -6); }).sort(function (a, b) { return cmp(a.ed, b.ed); });
   }
   /* 만료일에서 거꾸로 잡은 준비 일정(실무 권장). 법정 기한은 입찰·계약 메뉴에서 공고일 기준으로 다시 계산한다. */
-  function conSteps(o) {
-    var L = [];
+  /* 관리규약에서 재계약 기한을 찾는다. 단지마다 문장이 달라 사람이 확인한 뒤 쓴다. */
+  function ruleScan(arts) {
+    var out = {};
+    (arts || []).forEach(function (a) {
+      var tt = String(a.title || ''), b = String(a.body || '');
+      var lab = '제' + a.no + '조' + (a.sub ? '의' + a.sub : '') + (tt ? '(' + tt + ')' : '');
+      var sent = function (re) { var m = b.split(/\n|(?=[②③④⑤⑥⑦⑧⑨⑩])/).filter(function (x) { return re.test(x); })[0]; return m ? m.trim().slice(0, 260) : ''; };
+      var isMgr = /주택관리업자/.test(tt) && /재계약|재선정/.test(tt), isBiz = !isMgr && /재계약/.test(tt) && /사업자/.test(tt + b.slice(0, 120));
+      if (!isMgr && !isBiz) return;
+      var d = b.match(/계약\s*만료\s*(?:일\s*)?(\d+)\s*일\s*전/) || b.match(/(\d+)\s*일\s*전까지/);
+      var o = { art: lab, d: d ? +d[1] : 0, txt: sent(/일\s*전/) };
+      if (isBiz) {
+        var post = b.match(/(\d+)\s*일\s*이상\s*(?:게시|공고)/), sc = b.match(/(\d+)\s*점\s*이상/), fr = b.match(/(\d+)\s*분의\s*(\d+)/);
+        o.post = post ? +post[1] : 0; o.score = sc ? +sc[1] : 0; o.frac = fr ? fr[1] + '분의 ' + fr[2] : '';
+        if (!out.biz) out.biz = o;
+      } else if (!out.mgr) { var p2 = b.match(/(\d+)\s*일\s*이상\s*공고/); o.post = p2 ? +p2[1] : 0; out.mgr = o; }
+    });
+    return out;
+  }
+  function rl(a) { a = String(a || '직접 입력'); return /^관리규약/.test(a) ? a : '관리규약 ' + a; }
+  function conSteps(o, rule) {
+    var L = [], R = rule || {};
+    if (!/:광고:/.test(o.k || '') && !o.mgr && R.biz && R.biz.d) {
+      var b = R.biz, due = addD(o.ed, -b.d), pe = b.post ? addD(due, b.post) : due, small = o.amt > 0 && o.amt <= 5000000;
+      L.push({ due: addD(due, -15), t: '사업수행실적 평가 시작 — 기존 사업자와 재계약하려면', how: '관리규약의 평가표 서식으로 평가합니다. 평가 마감(' + due + ')보다 넉넉히 시작합니다(실무 권장).' + (small ? ' 500만원(부가세 제외) 이하이면 2인 이상 견적서로 수의계약하는 길도 있습니다(선정지침 별표 2 제6호).' : ''), law: '' });
+      L.push({ due: due, t: '사업수행실적 평가 마감' + (b.score ? ' — ' + b.score + '점 이상이면 평가서 게시 시작' : ''), how: (b.txt || '계약만료 ' + b.d + '일 전까지 평가') + ' (선정지침 별표 2 제9호에 따른 재계약)', law: rl(b.art), rule: 1 });
+      if (b.post) L.push({ due: pe, t: '평가서 게시 ' + b.post + '일 끝 — 이의신청 집계', how: '이의신청이 ' + (b.frac || '규약에서 정한 비율') + ' 미만이면 입대의 의결로 재계약, 그 이상이거나 의결을 못 받으면 경쟁입찰로 바꿉니다.', law: rl(b.art), rule: 1 });
+      L.push({ due: pe, t: '입대의 의결 (재계약) 또는 경쟁입찰 전환', how: '의결 결과를 회의록에 남깁니다.', law: rl(b.art), rule: 1 });
+      var cd = addD(o.ed, -30); if (cd < addD(pe, 5)) cd = addD(pe, 5); if (cd > o.ed) cd = o.ed;
+      L.push({ due: cd, t: '재계약 체결', how: '계약서는 체결 후 1개월 안에 공개합니다(법 제28조).', law: '법 제28조' });
+      L.push({ due: o.ed, t: '계약 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
+      return L;
+    }
+    if (o.mgr && R.mgr && R.mgr.d) {
+      var m = R.mgr, md = addD(o.ed, -m.d);
+      L.push({ due: addD(md, -30), t: '재선정 방법 검토 시작 — 재계약할지 입찰할지', how: '규약 기한(' + md + ') 전에 입대의 안건으로 올릴 수 있게 준비합니다(실무 권장).', law: '' });
+      L.push({ due: md, t: '재계약 제안 — 입대의 의결', how: m.txt || ('계약만료 ' + m.d + '일 전까지 입대의 의결로 제안'), law: rl(m.art), rule: 1 });
+      if (m.post) L.push({ due: addD(md, m.post), t: '선관위 공고 ' + m.post + '일 이상 → 입주자등 동의 절차', how: '선거관리위원회에 동의 절차 진행을 통지하고, 공고 후 동의를 받습니다.', law: rl(m.art), rule: 1 });
+      L.push({ due: addD(o.ed, -1), t: '전체 입주자등 과반수 동의 마감 — 못 받으면 경쟁입찰', how: '만료 전까지 과반수 동의가 없으면 경쟁입찰로 선정합니다(선정지침 제4조제4항).', law: rl(m.art), rule: 1 });
+      L.push({ due: o.ed, t: '계약 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
+      return L;
+    }
     if (o.mgr) {
       L.push({ due: addD(o.ed, -150), t: '재선정 방법 정하기 — 입대의 의결로 제안', how: '주택관리업자는 입찰이든 재계약(수의계약)이든 입대의 의결로 제안하고 전체 입주자등 과반수 동의를 받아야 합니다(선정지침 제4조제4항·제5항 단서). 동의 기간까지 넉넉히 잡습니다.', law: '선정지침 제4조' });
       L.push({ due: addD(o.ed, -90), t: '입주자등 동의 받기 / 입찰공고', how: '입찰이면 마감일 전일부터 10일 전까지 공고(제15조).', law: '선정지침 제4조·제15조' });
     } else {
-      L.push({ due: addD(o.ed, -90), t: '재계약할지 입찰할지 정하기 — 사업수행실적 평가·입대의 의결', how: '기존 사업자와 재계약(수의계약)하려면 별표 2 해당 여부와 실적 평가를 거쳐 계약 전에 입대의 의결(제4조제5항). 입찰이면 입찰 방법·낙찰 방법 등을 공고 전에 의결(제4조제4항).', law: '선정지침 제4조' });
+      if (/:광고:/.test(o.k)) {
+        L.push({ due: addD(o.ed, -60), t: '광고(잡수입) 계약 — 연장할지 새 업체를 고를지 정하기', how: '승강기 TV·게시판 광고처럼 단지가 돈을 받는 계약입니다. 연장·재선정 방법은 관리규약과 입찰·계약 메뉴에서 확인하고 입대의에 보고합니다. (준비 일정은 실무 권장)', law: '' });
+        L.push({ due: o.ed, t: '계약 만료', how: o.co + ' · ' + o.st + ' ~ ' + o.ed, law: '' });
+        return L;
+      }
+      var small = o.amt > 0 && o.amt <= 5000000;
+      L.push({ due: addD(o.ed, -90), t: small ? '다음 계약 방법 정하기 — 500만원 이하면 견적 2곳으로 수의계약 가능' : '재계약할지 입찰할지 정하기 — 사업수행실적 평가·입대의 의결',
+        how: (small ? 'K-apt 금액이 ' + o.amt.toLocaleString('ko-KR') + '원이라 500만원(부가세 제외) 이하이면 2인 이상 견적서로 수의계약할 수 있습니다(별표 2 제6호, 나눠 계약 금지). 기존 사업자와 실적 평가로 재계약하려면 입대의 의결(제4조제5항). ' : '기존 사업자와 재계약(수의계약)하려면 별표 2 해당 여부와 실적 평가를 거쳐 계약 전에 입대의 의결(제4조제5항). ') + '입찰이면 입찰 방법·낙찰 방법 등을 공고 전에 의결(제4조제4항).', law: '선정지침 제4조' + (small ? '·별표 2' : '') });
       L.push({ due: addD(o.ed, -60), t: '입찰공고 또는 재계약 절차 진행', how: '입찰공고는 마감일 전일부터 10일 전까지(긴급·재공고는 5일), 현장설명회를 하면 설명회 전일부터 5일 전까지(제23조).', law: '선정지침 제23조' });
     }
     L.push({ due: addD(o.ed, -30), t: '계약 체결 목표', how: '낙찰자가 정해지면 다음 근무일 18시까지 결과 공개(제11조), 10일 안에 계약(제21조·제29조), 계약서는 1개월 안에 공개(법 제28조).', law: '선정지침 제11조·제29조, 법 제28조' });
@@ -1580,7 +1633,7 @@ var CAL = (function () {
     });
     return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//guyeon-hub//cal//KO', 'CALSCALE:GREGORIAN'].concat(ev).concat(['END:VCALENDAR']).join('\r\n') + '\r\n';
   }
-  return { DEF: DEF, def: def, build: build, conGroups: conGroups, conSteps: conSteps, conKey: conKey, status: status, ics: ics, addM: addM, addD: addD, eom: eom, parse: parse };
+  return { DEF: DEF, def: def, build: build, conGroups: conGroups, conSteps: conSteps, ruleScan: ruleScan, conKey: conKey, status: status, ics: ics, addM: addM, addD: addD, eom: eom, parse: parse };
 })();
 
 
@@ -2143,7 +2196,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.21.1';
+var APP_VER='1.22.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5163,7 +5216,7 @@ function calLinks(){
     var con=(S.rows.filter(function(r){return r.k==='con';})[0]||{}).d||b.conDate;
     if(con&&/^\d{4}-\d\d-\d\d$/.test(con))L.push({t:nm+': 계약서 공개 (홈페이지·동별 게시판)',due:CAL.addM(con,1),src:'입찰·계약',law:'공동주택관리법 제28조',how:'계약 체결일부터 1개월 이내, 개인정보는 가리고'});
   }catch(e){}
-  try{var c=CQ(),t0=calToday();(c.cons||[]).forEach(function(o){if(c.conOff[o.k]||o.ed<t0)return;CAL.conSteps(o).forEach(function(st){L.push({t:o.t+': '+st.t,due:st.due,src:'계약 만료',law:st.law,how:st.how+(st.law?' (준비 일정은 실무 권장)':'')});});});}catch(e){}
+  try{var c=CQ(),t0=calToday();(c.cons||[]).forEach(function(o){if(c.conOff[o.k]||o.ed<t0)return;CAL.conSteps(o,calRule()).forEach(function(st){L.push({t:o.t+': '+st.t,due:st.due,src:'계약 만료',law:st.law,how:st.how+(st.rule||!st.law?'':' (준비 일정은 실무 권장)')});});});}catch(e){}
   try{var S2=eSched();S2.rows.forEach(function(r){if(r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)&&/notice|vote|result|cm$/.test(r.k))L.push({t:'선거: '+r.t,due:r.d,src:'선거',law:r.law,how:r.note});});}catch(e){}
   return L;
 }
@@ -5200,7 +5253,7 @@ function calPaint(){
   var c=CQ(),v=c.ui.v||'now',box=$('#calv');if(!box)return;
   $$('#caltabs button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.calv===v));});
   if(v==='set'){box.innerHTML=calSetHtml();return;}
-  if(v==='con'){box.innerHTML=calConHtml();return;}
+  if(v==='con'){box.innerHTML=calRuleHtml()+calConHtml();return;}
   if(v==='law'){box.innerHTML='<section class="card"><h2>업무별 근거 <small>2026. 11. 법제처 현행본 기준</small></h2><ul class="chk">'+CAL.DEF.map(function(d){return '<li><b>·</b><span><b>'+esc(d.t)+'</b><br><small class="muted">'+esc(d.law)+'</small><br><small>'+esc(d.how)+'</small></span></li>';}).join('')+'</ul><p class="muted" style="margin-top:.6rem">소방시설 자체점검(별표 3)과 공동주택 소독 횟수(별표 7)는 법령 별표라 소방서·보건소 안내문으로 확인했습니다. 법령이 바뀌면 이 목록도 고쳐야 하니, 이상한 점이 보이면 알려 주세요.</p></section>';return;}
   var B=calBuckets(),bar='<div class="row" style="margin:0 0 .8rem;flex-wrap:wrap"><button type="button" class="btn" data-act="calics">휴대폰 달력 파일(.ics) 받기</button><button type="button" class="btn ghost" data-act="calics" data-lite="1">매달 반복 업무 빼고 받기</button><button type="button" class="btn ghost" data-act="caldocx">연간 계획표 Word로 저장</button><button type="button" class="btn ghost" data-act="caldocx" data-hx="1">연간 계획표 한글로 저장</button></div>';
   if(v==='year'){
@@ -5268,6 +5321,22 @@ function calHomeCard(){
     (list.length?'<ul class="chk">'+list.map(function(x){return calRow(x,false);}).join('')+'</ul>':'<p class="muted">이번 달 기한인 업무가 없습니다.</p>')+
     '<div class="row" style="margin-top:.6rem"><button type="button" class="btn ghost sm" data-go="cal">업무달력 열기</button></div></section>';
 }
+function calRuleFound(){try{var r=R();return r.base&&r.base.arts?CAL.ruleScan(r.base.arts):{};}catch(e){return {};}}
+function calRule(){var c=CQ(),o={};['biz','mgr'].forEach(function(k){var x=c.rule&&c.rule[k];if(x&&x.ok&&+x.d>0)o[k]={art:x.art,d:+x.d,post:+x.post||0,score:+x.score||0,frac:x.frac||'',txt:x.txt||''};});return o;}
+function calRuleHtml(){
+  var c=CQ(),F=calRuleFound(),has=false;try{has=!!(R().base&&R().base.arts);}catch(e){}
+  var nm={biz:['기존 사업자 재계약','경비·청소·승강기 등 용역 사업자를 실적 평가로 재계약할 때'],mgr:['주택관리업자 재계약','위탁관리회사를 재계약할 때']};
+  var row=function(k){var s=(c.rule||{})[k],f=F[k],h='<div class="cr-row"><b>'+nm[k][0]+'</b> <small class="muted">'+nm[k][1]+'</small>';
+    if(s&&s.ok){h+='<p style="margin:.3rem 0"><span class="tag on">규약 기준 사용 중</span> 계약만료 <b>'+esc(s.d)+'일 전</b>'+(k==='biz'&&s.post?' · 평가서 게시 '+esc(s.post)+'일':'')+' <span class="muted">('+esc(s.art)+')</span></p>';
+      if(f&&f.d&&+f.d!==+s.d)h+='<p class="note" style="margin:.2rem 0">지금 관리규약에는 <b>'+f.d+'일 전</b>으로 되어 있습니다('+esc(f.art)+'). 규약이 바뀌었으면 다시 확인하세요. <button type="button" class="btn sm" data-act="calrule" data-k="'+k+'">규약대로 바꾸기</button></p>';
+      h+='<button type="button" class="btn ghost sm" data-act="calruleoff" data-k="'+k+'">규약 기준 끄기</button>';}
+    else if(f&&f.d){h+='<p style="margin:.3rem 0">관리규약 <b>'+esc(f.art)+'</b>에서 찾았습니다: 계약만료 <b>'+f.d+'일 전</b>'+(k==='biz'?(f.post?' · 평가서 게시 '+f.post+'일':'')+(f.frac?' · 이의신청 '+esc(f.frac):''):(f.post?' · 공고 '+f.post+'일':''))+'</p><blockquote class="cr-q">'+esc(f.txt)+'</blockquote>'+
+      '<div class="row"><button type="button" class="btn sm" data-act="calrule" data-k="'+k+'">맞습니다 — 이 기준으로 쓰기</button></div>';}
+    else h+='<p class="muted" style="margin:.3rem 0">'+(has?'관리규약에서 이 조문을 찾지 못했습니다.':'관리규약 메뉴에 현행 규약을 넣으면 여기서 기한을 찾아 드립니다.')+' 직접 넣을 수도 있습니다.</p>';
+    if(!(s&&s.ok))h+='<details style="margin-top:.3rem"><summary class="muted" style="cursor:pointer">숫자 직접 넣기</summary><div class="row" style="align-items:flex-end;margin-top:.3rem"><label class="f" style="margin:0"><span>계약만료 며칠 전까지</span><input type="number" min="1" max="365" id="cr-'+k+'-d" style="width:6rem"></label>'+(k==='biz'?'<label class="f" style="margin:0"><span>평가서 게시 일수</span><input type="number" min="0" max="60" id="cr-'+k+'-p" style="width:6rem"></label>':'')+'<label class="f" style="margin:0;flex:1;min-width:8rem"><span>근거 (예: 관리규약 제72조)</span><input type="text" id="cr-'+k+'-a"></label><button type="button" class="btn sm" data-act="calrulemanual" data-k="'+k+'">저장</button></div></details>';
+    return h+'</div>';};
+  return '<section class="card"><h2>우리 관리규약 기한 <small>재계약 일정에 씁니다</small></h2><p class="muted" style="margin:0 0 .6rem">관리규약이 정한 재계약 기한이 있으면 그 날짜로 일정을 잡습니다. 규약에서 찾은 숫자는 확인을 누른 뒤에만 씁니다. 규약 기준을 쓰지 않는 계약은 실무 권장 일정(만료 90·60·30일 전)으로 잡습니다.</p>'+row('biz')+row('mgr')+'</section>';
+}
 function calConHtml(){
   var c=CQ(),t=calToday(),L=c.cons||[];
   var h='<section class="card"><h2>용역·관리 계약 만료 <small>K-apt 계약 공지에서 가져옴</small></h2>'+
@@ -5301,6 +5370,9 @@ function calAct(act,a){
     saveNow();calRefresh();toast('완료로 표시했습니다('+t+').'+(c.last[id]===t?' 다음 기한을 오늘부터 다시 계산했습니다.':''));return true;}
   if(act==='calundo'){delete c.done[a.dataset.key];saveNow();calRefresh();return true;}
   if(act==='calcon'){calConPull();return true;}
+  if(act==='calrule'){var f=calRuleFound()[a.dataset.k];if(f){c.rule=c.rule||{};c.rule[a.dataset.k]=Object.assign({},f,{ok:true});saveNow();calPaint();toast('관리규약 기준으로 재계약 일정을 다시 잡았습니다.');}return true;}
+  if(act==='calruleoff'){if(c.rule)delete c.rule[a.dataset.k];saveNow();calPaint();return true;}
+  if(act==='calrulemanual'){var k=a.dataset.k,d=+(($('#cr-'+k+'-d')||{}).value||0);if(!(d>0)){toast('며칠 전까지인지 숫자를 넣어 주세요.');return true;}c.rule=c.rule||{};c.rule[k]={ok:true,d:d,post:+(($('#cr-'+k+'-p')||{}).value||0),art:(($('#cr-'+k+'-a')||{}).value||'직접 입력'),txt:'',score:0,frac:''};saveNow();calPaint();toast('저장했습니다.');return true;}
   if(act==='calconon'){if(a.checked)delete c.conOff[a.dataset.k];else c.conOff[a.dataset.k]=1;saveNow();return true;}
   if(act==='calset'){c.ui.v='set';saveNow();calPaint();return true;}
   if(act==='calcuadd'){c.custom.push({name:'',cyc:'',last:'',law:''});saveNow();calPaint();return true;}
