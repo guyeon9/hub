@@ -2209,7 +2209,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.23.0';
+var APP_VER='1.23.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5632,7 +5632,7 @@ function demoEnd(){
 }
 function demoBar(){var b=$('#demobar');if(!b)return;b.hidden=!isDemo();}
 
-function hmKeyMsg(k,isNew){var m=$('#hm-keymsg');if(!m)return;m.innerHTML=(isNew?'<b>새 열쇠를 만들어 이 컴퓨터에 넣었습니다.</b><br>':'')+'<code style="user-select:all;word-break:break-all">'+esc(k)+'</code> <button type="button" class="btn ghost sm" id="hm-keycopy">복사</button><br>Cloudflare → Workers → kapt-hub → 설정 → 변수 및 비밀 → 비밀 <b>HUB_KEYS</b>에 이 값을 넣고 배포하세요. 여러 사람이면 쉼표로 이어 붙입니다.';var c=$('#hm-keycopy');if(c)c.onclick=function(){try{navigator.clipboard.writeText(k).then(function(){toast('복사했습니다.');});}catch(e){}};}
+function hmKeyMsg(k,isNew){var m=$('#hm-keymsg');if(!m)return;m.innerHTML=(isNew?'<b>새 열쇠를 만들어 이 컴퓨터에 넣었습니다.</b><br>':'')+'<code>'+esc(k.slice(0,6))+'…'+esc(k.slice(-4))+'</code> <button type="button" class="btn sm" id="hm-keycopy">열쇠 전체 복사</button> <small>(화면에는 일부만 보입니다. 캡처해서 남에게 보내지 마세요.)</small><br>Cloudflare → Workers → kapt-hub → 설정 → 변수 및 비밀 → 비밀 <b>HUB_KEYS</b>에 이 값을 넣고 배포하세요. 여러 사람이면 쉼표로 이어 붙입니다.';var c=$('#hm-keycopy');if(c)c.onclick=function(){try{navigator.clipboard.writeText(k).then(function(){toast('복사했습니다.');});}catch(e){}};}
 function hmAct(act,a){
   if(act==='hmkeygen'){if(state.kapt.key&&!confirm('이미 열쇠가 있습니다. 새로 만들면 Cloudflare의 HUB_KEYS도 바꿔야 합니다. 새로 만들까요?'))return true;var r=new Uint8Array(18);crypto.getRandomValues(r);var k='gh_'+Array.prototype.map.call(r,function(x){return ('0'+x.toString(16)).slice(-2);}).join('');state.kapt.key=k;saveNow();var el=$('#f-kapt-key');if(el)el.value=k;hmKeyMsg(k,true);return true;}
   if(act==='hmkeyshow'){var k2=String(state.kapt.key||'').trim();if(!k2){toast('아직 열쇠가 없습니다. "새 열쇠 만들기"를 누르세요.');return true;}hmKeyMsg(k2,false);return true;}
