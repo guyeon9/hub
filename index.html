@@ -2209,7 +2209,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.23.1';
+var APP_VER='1.23.2';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2961,7 +2961,7 @@ function shell(){
   '</div><nav class="tabs" id="tabs" aria-label="메뉴">'+
     TABS.map(function(t){return '<button type="button" data-tab="'+t.id+'">'+t.t+(t.s?'<small>'+t.s+'</small>':'')+'</button>';}).join('')+
   '</nav></header><div id="demobar" class="demobar" hidden><div class="wrap row" style="justify-content:space-between"><span><b>예시 단지를 보는 중입니다.</b> 가상의 단지라 마음껏 눌러 봐도 내 자료에는 섞이지 않습니다.</span><button type="button" class="btn sm" id="demoend">예시 끝내고 내 자료로</button></div></div><main class="wrap" id="view"></main>'+
-  '<footer class="wrap muted" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem">결과는 참고용이며 최종 확인 책임은 관리주체에 있습니다. 입력한 내용은 이 브라우저에 저장되고, 자동 저장 파일을 연결하면 소장님이 고른 파일에도 저장됩니다. K-apt·법령 조회를 누를 때만 단지코드와 조회 조건이 통로 서버로 나가며, 불러온 파일은 밖으로 보내지 않습니다. · 버전 '+APP_VER+'</footer>';
+  '<footer class="wrap muted" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem">결과는 참고용이며 최종 확인 책임은 관리주체에 있습니다. 입력한 내용은 이 브라우저에 저장되고, 자동 저장 파일을 연결하면 소장님이 고른 파일에도 저장됩니다. K-apt·법령 조회를 누를 때만 단지코드와 조회 조건이 통로 서버로 나가며, 불러온 파일은 밖으로 보내지 않습니다. · 버전 '+APP_VER+'<p style="margin:.6rem 0 0;font-size:.82rem">ⓒ 2026 구연(九緣). 이 프로그램의 화면 구성·문구·소스 코드에 대한 저작권은 구연에게 있습니다. 저작권자의 허락 없이 복제·수정·배포하거나 판매·대여할 수 없으며, 위반 시 저작권법 제136조제1항에 따라 처벌될 수 있습니다.</p></footer>';
   $('#tabs').addEventListener('click',function(e){var b=e.target.closest('button[data-tab]');if(b)go(b.dataset.tab);});
   $('#demoend').addEventListener('click',demoEnd);
   $('#fontseg').addEventListener('click',function(e){var b=e.target.closest('button[data-f]');if(!b)return;state.ui.font=b.dataset.f;save();applyFont();paintFont();});
