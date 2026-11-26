@@ -2215,7 +2215,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.26.0';
+var APP_VER='1.26.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -3285,7 +3285,11 @@ function spWizHtml(){
       SP_DOCS.map(function(g){return '<div class="sp-grp"><span class="sp-gt">'+g[0]+'</span>'+g[1].map(function(d){return '<label class="sp-ck"><input type="checkbox" data-bind="safety.have.'+d[0]+'"'+(h[d[0]]?' checked':'')+'> '+esc(d[1])+'</label>';}).join('')+'</div>';}).join('')+
       '<label class="f" style="margin-top:.5rem"><span>현장에서 확인한 내용 (선택)</span><textarea data-bind="safety.memo" rows="3" placeholder="예: 보일러실 없음(개별난방). 주민운동시설 1곳(관리동 2층). 지하주차장 차수판 2곳. 도면의 경비실 1곳은 철거됨.">'+esc(state.safety.memo||'')+'</textarea><em>도면이나 옛 계획서와 현장이 다른 점을 적어 두면 AI가 현장 기준으로 채웁니다.</em></label></div></div>'+
     '<div class="sp-step"><b class="sp-n">2</b><div><b>AI에게 부탁하기</b> — 둘 중 편한 방법을 고르세요'+
-      '<div class="sp-way"><b>가. Claude 앱 폴더 방식 (권장)</b><ol style="margin:.3rem 0 0 1.1rem;padding:0;font-size:.9rem"><li>내 컴퓨터에 <b>"안전관리계획"</b> 폴더를 만들고 위 자료를 넣습니다. <button type="button" class="btn ghost sm" data-act="spprep">준비물 목록 파일 받기</button><br><span class="muted" style="font-size:.86rem">자료가 컴퓨터 여기저기 흩어져 있으면 → <button type="button" class="btn ghost sm" data-act="spgather">자료 찾아 모으기 문장 복사</button> Claude가 찾은 목록을 먼저 보여 주고, "좋아"라고 하면 복사해 모읍니다(원본은 그대로).</span></li><li>Claude 데스크톱 앱에서 그 폴더를 연결합니다. 이미 연결해 둔 상위 폴더(예: 문서, 업무 폴더) 안에 만들었다면 따로 연결하지 않아도 됩니다.</li><li><button type="button" class="btn sm" data-act="spfolder">폴더용 부탁 문장 복사</button> → Claude에 붙여넣기</li><li>Claude가 폴더에 <b>안전관리계획_채우기.txt</b>와 <b>안전관리계획_부족자료.txt</b>를 저장합니다. 부족자료 목록을 보고 자료를 더 넣었으면 다시 부탁하세요.</li></ol></div>'+
+      '<div class="sp-way"><b>가. Claude 앱 폴더 방식 (권장)</b><ol style="margin:.3rem 0 0 1.1rem;padding:0;font-size:.9rem">'+
+        '<li>Claude 데스크톱 앱에 업무 자료가 있는 폴더(예: 문서, 관리사무소 업무 폴더)가 연결돼 있는지 확인합니다.</li>'+
+        '<li><button type="button" class="btn sm" data-act="spgather">자료 찾아 모으기 문장 복사</button> → Claude에 붙여넣기. Claude가 찾은 파일을 표로 보여 주면 확인하고 <b>"좋아"</b>라고 답하세요. <b>"안전관리계획"</b> 폴더가 만들어지고 자료가 복사됩니다(원본은 그대로).<br><span class="muted" style="font-size:.86rem">자료를 직접 모으실 거면 이 단계 대신 <button type="button" class="btn ghost sm" data-act="spprep">준비물 목록 파일 받기</button>를 보고 "안전관리계획" 폴더에 넣으세요.</span></li>'+
+        '<li><button type="button" class="btn sm" data-act="spfolder">폴더용 부탁 문장 복사</button> → Claude에 붙여넣기</li>'+
+        '<li>Claude가 폴더에 <b>안전관리계획_채우기.txt</b>와 <b>안전관리계획_부족자료.txt</b>를 저장합니다. 부족자료 목록을 보고 자료를 더 넣었으면 3번을 다시 하세요.</li></ol></div>'+
       '<div class="sp-way"><b>나. AI 창에 붙여넣기 (Claude·ChatGPT·제미나이)</b><div class="row" style="margin-top:.3rem"><button type="button" class="btn ghost sm" data-act="aicopy">부탁 문장 복사</button><button type="button" class="btn ghost sm" data-act="aitxt">파일로 저장</button></div><p class="muted" style="margin:.3rem 0 0;font-size:.86rem">체크한 자료의 사진·PDF를 같이 올리세요. 많으면 나눠서 두세 번 부탁해도 됩니다.</p></div></div></div>'+
     '<div class="sp-step"><b class="sp-n">3</b><div><b>결과 넣기</b><div class="row" style="margin-top:.3rem"><button type="button" class="btn" data-act="spfile">결과 파일 불러오기 (가 방법)</button><input type="file" id="sp-file" accept=".txt,text/plain" hidden></div><p class="muted" style="margin:.4rem 0 .2rem;font-size:.86rem">나 방법이면 AI가 준 답(코드 블록)을 통째로 복사해 아래에 붙여넣으세요.</p>'+
       '<textarea id="aitext2" rows="5" placeholder="#구연-채우기 v1&#10;23.2.5 = 44,026.04㎡&#10;# 확인 필요: 41.3.2 - 점검일 기록 없음"></textarea>'+
