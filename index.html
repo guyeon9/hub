@@ -129,6 +129,11 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .cr-row{border-top:1px solid var(--line);padding:.6rem 0}
 .cr-row:first-of-type{border-top:0}
 .cr-q{margin:.3rem 0 .5rem;padding:.4rem .7rem;border-left:3px solid var(--accent);background:var(--surface2);font-size:.86rem;color:var(--ink2);border-radius:0 .4rem .4rem 0}
+.sp-wiz summary{list-style:none}.sp-wiz summary::-webkit-details-marker{display:none}
+.sp-step{display:flex;gap:.7rem;margin-top:.9rem;align-items:flex-start}.sp-step>div{flex:1;min-width:0}
+.sp-n{flex:none;width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:.9rem}
+.sp-grp{margin-top:.5rem}.sp-gt{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.15rem}
+.sp-ck{display:flex;gap:.45rem;align-items:flex-start;font-size:.9rem;padding:.15rem 0;cursor:pointer}.sp-ck input{width:auto;margin-top:.2rem}
 .demobar{background:#fff4d6;border-bottom:1px solid #e9c46a;color:#5b4300;padding:.45rem 0;font-size:.88rem}
 .demobar[hidden]{display:none}
 .su{border:2px solid var(--accent)}
@@ -2209,7 +2214,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.23.2';
+var APP_VER='1.24.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2223,7 +2228,7 @@ function defaultState(){
     cal:calDefault(),
     sys:sysDefault(),
     kapt:{api:'https://kapt-hub.smartgloomy.workers.dev',code:'',key:''},
-    safety:{ver:SP_VER,edits:{}},
+    safety:{ver:SP_VER,edits:{},have:{},memo:''},
     rules:rulesDefault(),
     bids:[bidDefault()],bidCur:0,
     elect:electDefault(),
@@ -3125,7 +3130,7 @@ function renderSafety(v){
       '<div class="row" style="margin-top:.4rem"><button type="button" class="btn sm" data-act="aiopen">② AI 결과 넣기</button></div></div>'+
     '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem"><b style="font-size:.85rem">목차</b><nav class="toc" id="sptoc">'+spToc()+'</nav></div>'+
     '<div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem" id="sp-reset"><button type="button" class="btn danger sm" data-act="spreset">고친 내용 되돌리기</button></div>'+
-  '</aside><div style="min-width:0"><section class="card" id="aipanel" hidden style="margin-bottom:1rem"></section><article class="doc docv" id="spdoc">'+(SPT.length?blocksHtml(SPT,{edit:1,edits:state.safety.edits}):'<p>양식을 불러오지 못했습니다.</p>')+'</article></div></div>';
+  '</aside><div style="min-width:0">'+spWizHtml()+'<section class="card" id="aipanel" hidden style="margin-bottom:1rem"></section><article class="doc docv" id="spdoc">'+(SPT.length?blocksHtml(SPT,{edit:1,edits:state.safety.edits}):'<p>양식을 불러오지 못했습니다.</p>')+'</article></div></div>';
 }
 function spBase(key){
   var a=key.split('.').map(Number);var b=SPT[a[0]];if(!b)return '';
@@ -3181,6 +3186,29 @@ function spFillList(){
   return out;
 }
 function curVal(k){var ed=state.safety.edits;var v=Object.prototype.hasOwnProperty.call(ed,k)?tokens(ed[k]):spBase(k);return v;}
+var SP_DOCS=[
+  ['도면',[['plan','단지 배치도 (동·주차장·놀이터·경로당·옹벽·담장 위치)'],['mech','기계설비 도면 (펌프실·저수조·기계실·배관)'],['elec','전기설비 도면 (전기실·변전설비·비상발전기)'],['fire','소방설비 도면 (소화전·스프링클러·소방펌프·비상방송)']]],
+  ['사람·조직',[['org','관리사무소 조직도·직원 명단 (직책·담당)'],['lic','직원 자격증 사본 (전기·소방·기계·가스 등)'],['appoint','전기·소방 안전관리자 선임 서류']]],
+  ['기존 서류',[['oldplan','기존 안전관리계획서'],['kapt','K-apt 단지 기본정보 화면 (홈에서 "불러오기"를 했다면 생략)']]],
+  ['점검·검사 기록과 계약서',[['fireck','소방시설 작동점검·종합점검 보고서'],['elecck','전기안전 정기점검 기록 또는 대행 계약서'],['elev','승강기 정기검사 합격증·유지관리 계약서'],['play','어린이놀이시설 안전검사 결과'],['tank','저수조 청소·위생점검·수질검사 기록'],['gas','가스 안전점검 기록'],['septic','정화조 청소 계약·기록'],['struct','시설물 안전점검 보고서'],['ins','화재보험·배상책임보험 증권'],['flood','지하주차장 침수 대비 자료 (차수판·양수기·집수정)']]]
+];
+function spHaveList(){var h=(state.safety&&state.safety.have)||{},o=[];SP_DOCS.forEach(function(g){g[1].forEach(function(d){if(h[d[0]])o.push(d[1]);});});return o;}
+function spWizHtml(){
+  var h=state.safety.have||{},n=0,tot=0;SP_DOCS.forEach(function(g){g[1].forEach(function(d){tot++;if(h[d[0]])n++;});});
+  var open=Object.keys(state.safety.edits).length<30;
+  return '<section class="card sp-wiz"><details'+(open?' open':'')+'><summary style="cursor:pointer"><h2 style="display:inline">AI로 쉽게 채우기 <small>자료만 모으면 AI가 칸을 채웁니다 · 3단계</small></h2></summary>'+
+    '<div class="sp-step"><b class="sp-n">1</b><div><b>가지고 있는 자료에 체크하세요</b> <small class="muted">없는 자료는 빼고 진행해도 됩니다. 사진이나 PDF면 충분합니다.</small>'+
+      SP_DOCS.map(function(g){return '<div class="sp-grp"><span class="sp-gt">'+g[0]+'</span>'+g[1].map(function(d){return '<label class="sp-ck"><input type="checkbox" data-bind="safety.have.'+d[0]+'"'+(h[d[0]]?' checked':'')+'> '+esc(d[1])+'</label>';}).join('')+'</div>';}).join('')+
+      '<label class="f" style="margin-top:.5rem"><span>현장에서 확인한 내용 (선택)</span><textarea data-bind="safety.memo" rows="3" placeholder="예: 보일러실 없음(개별난방). 주민운동시설 1곳(관리동 2층). 지하주차장 차수판 2곳. 도면의 경비실 1곳은 철거됨.">'+esc(state.safety.memo||'')+'</textarea><em>도면이나 옛 계획서와 현장이 다른 점을 적어 두면 AI가 현장 기준으로 채웁니다.</em></label></div></div>'+
+    '<div class="sp-step"><b class="sp-n">2</b><div><b>부탁 문장을 복사해 AI에 붙여넣고, 체크한 자료 파일을 같이 올리세요</b> <small class="muted">Claude·ChatGPT·제미나이 어느 것이든 됩니다.</small>'+
+      '<div class="row" style="margin-top:.4rem"><button type="button" class="btn" data-act="aicopy">부탁 문장 복사</button><button type="button" class="btn ghost" data-act="aitxt">파일로 저장</button></div>'+
+      '<p class="muted" style="margin:.4rem 0 0;font-size:.86rem">자료가 많아 한 번에 안 올라가면 나눠서 두세 번 부탁해도 됩니다. 결과를 차례로 3단계에 넣으면 쌓입니다.</p></div></div>'+
+    '<div class="sp-step"><b class="sp-n">3</b><div><b>AI가 준 답(코드 블록)을 통째로 복사해 붙여넣으세요</b>'+
+      '<textarea id="aitext2" rows="5" placeholder="#구연-채우기 v1&#10;23.2.5 = 44,026.04㎡&#10;# 확인 필요: 41.3.2 - 점검일 기록 없음"></textarea>'+
+      '<div class="row" style="margin-top:.4rem"><button type="button" class="btn" data-act="aiapply2">계획서에 넣기</button>'+(aiUndo?'<button type="button" class="btn danger sm" data-act="aiundo">방금 넣은 것 되돌리기</button>':'')+'</div><div id="aimsg2" class="muted" style="margin-top:.4rem"></div></div></div>'+
+    '<p class="muted" style="margin:.6rem 0 0;font-size:.86rem">다 넣은 뒤 아래 계획서에서 노란 칸을 눈으로 확인하고, 틀린 칸은 눌러서 고친 다음 왼쪽 위 "한글로 저장"을 누르세요.</p>'+
+  '</details></section>';
+}
 function spPrompt(){
   var c=state.complex,list=spFillList();
   var head=[
@@ -3195,16 +3223,24 @@ function spPrompt(){
     '3. 단위가 함께 적힌 칸(예: "개소", "톤", "대")은 숫자와 단위를 같이 쓰세요. 예: 12 개소',
     '4. 한 칸 안에서 줄을 바꿔야 하면 \\n 을 쓰세요.',
     '5. 답은 아래 [답 형식] 그대로 코드 블록 하나에만 쓰세요. 바꿀 칸만 쓰면 됩니다.',
+    '6. 도면·옛 계획서와 [현장 확인 메모]가 다르면 현장 확인 메모를 따르세요. 현장에 없는 시설은 "해당 없음"으로 쓰세요.',
+    '7. 자료가 없거나 서로 맞지 않아 사람이 확인해야 할 중요한 칸은 코드 블록 끝에 "# 확인 필요: 번호 - 이유" 줄로 적어 주세요.',
     '',
     '[답 형식]',
     '#구연-채우기 v1',
     '번호 = 값',
     '',
+    '[제가 함께 올리는 자료]',
+  ].concat(spHaveList().length?spHaveList().map(function(t){return '- '+t;}):['- (체크한 자료 없음: 함께 올린 파일을 보고 판단해 주세요)']).concat([
+    '',
+    '[현장 확인 메모]',
+    String(state.safety.memo||'').trim()||'(없음)',
+    '',
     '[단지 기본 정보]',
     '단지명: '+c.name+(c.units?' / 세대수: '+c.units:'')+(c.director?' / 관리소장: '+c.director:''),
     '',
     '[빈칸 목록] 번호 | 위치 | 지금 값 (빈칸이면 "-")'
-  ];
+  ]);
   return head.concat(list.map(function(x){return x.k+' | '+x.loc+' | '+(x.cur.trim()?cut(x.cur,40):'-');})).join('\n');
 }
 var aiUndo=null;
@@ -7004,6 +7040,11 @@ function onClick(e){
   else if(act==='aitxt'){saveFile('안전관리계획서_AI채우기_'+state.complex.name+'.txt',new Blob([spPrompt()],{type:'text/plain'}));}
   else if(act==='aiopen'){aiPanel(true);}
   else if(act==='aiclose'){aiPanel(false);}
+  else if(act==='aiapply2'){var tx2=($('#aitext2')||{}).value||'';var r2=aiApply(tx2),m2=$('#aimsg2'),chk=String(tx2).split('\n').filter(function(l){return /^\s*#\s*확인\s*필요/.test(l);}).map(function(l){return l.replace(/^\s*#\s*확인\s*필요\s*[:：]?\s*/,'');});
+    if(!r2.ok){if(m2)m2.textContent='넣을 줄을 찾지 못했습니다. AI 답의 코드 블록(번호 = 값)을 통째로 붙여넣었는지 확인하세요.';}
+    else{$('#spdoc').innerHTML=blocksHtml(SPT,{edit:1,edits:state.safety.edits});var n3=$('#sp-n');if(n3)n3.textContent=Object.keys(state.safety.edits).length;$('#aitext2').value='';
+      if(m2)m2.innerHTML='<b>'+r2.ok+'칸을 넣었습니다.</b>'+(r2.skip?' 양식에 없는 번호 '+r2.skip+'줄은 건너뛰었습니다.':'')+' 아래 노란 칸을 확인하세요.'+(chk.length?'<div class="note" style="margin-top:.4rem"><b>AI가 확인을 부탁한 칸 '+chk.length+'개</b><ul style="margin:.3rem 0 0 1.1rem">'+chk.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>':'');
+      toast(r2.ok+'칸을 계획서에 넣었습니다.');}}
   else if(act==='aiapply'){var tx=$('#aitext').value;var r=aiApply(tx);
     if(!r.ok){$('#aimsg').textContent='넣을 줄을 찾지 못했습니다. "번호 = 값" 형식인지 확인하세요.';}
     else{var d=$('#spdoc');d.innerHTML=blocksHtml(SPT,{edit:1,edits:state.safety.edits});var n=$('#sp-n');if(n)n.textContent=Object.keys(state.safety.edits).length;aiPanel(true);$('#aimsg').textContent=r.ok+'칸을 넣었습니다.'+(r.skip?' 양식에 없는 번호 '+r.skip+'줄은 건너뛰었습니다.':'')+' 노란 칸을 확인하세요.';toast(r.ok+'칸을 계획서에 넣었습니다.');}}
