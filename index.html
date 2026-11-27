@@ -7205,7 +7205,7 @@ function gdSteps(id){
 var GD_LAWBASE={
   '공동주택관리법':{d:'20260701'},'공동주택관리법 시행령':{d:'20260701'},'공동주택관리법 시행규칙':{d:'20260730'},
   '산업안전보건법':{d:'20261027'},'산업안전보건법 시행령':{d:'20260801'},'산업안전보건법 시행규칙':{d:'20260801'},
-  '사업장 위험성평가에 관한 지침':{d:'',a:1,note:'2026.11.4. 전부개정(고시 제2026-73호) — 구글시트판 반영 검토 전'},
+  '사업장 위험성평가에 관한 지침':{d:'20261104',a:1},
   '주택관리업자 및 사업자 선정지침':{d:'20240411',a:1}
 };
 var GD_LAWS={
@@ -7236,7 +7236,11 @@ var GD_FIN={
     ['근로자를 참여시켰다(사업장 순회점검이 원칙, 설문·면담 병행 가능)','법 제36조, 시행규칙 제37조의2'],
     ['실시 전에 일정을, 실시 후에 결과(위험요인·수준·개선대책·이행 결과)를 근로자에게 알렸다','시행규칙 제37조의3'],
     ['기록에 실시 시기·담당자, 참여 근로자·근로자대표, 결과를 남겼다','시행규칙 제37조의4제1항'],
-    ['기록을 3년간 보존한다','시행규칙 제37조의4제2항']
+    ['기록을 3년간 보존한다(개선대책 수립을 마친 다음 날부터)','시행규칙 제37조의4제2항, 지침 제21조'],
+    ['위험성 판단 기준과 허용 가능한 수준을 미리 정했다','지침 제11조'],
+    ['개선 후 근로자와 함께 허용 수준이 됐는지 확인했다','지침 제6조제1항제4호, 제12조제3항'],
+    ['신규 채용·작업 변경 근로자에게 작업 전에 결과를 알렸다','지침 제17조제2항'],
+    ['실시규정을 작성해 두었다(상시근로자 5인 미만은 생략 가능)','지침 제19조']
   ]
 };
 function gdLawCache(){if(!state.gd)state.gd={};return state.gd;}
@@ -7256,7 +7260,7 @@ function gdPrepHtml(id){
   var g=gdLawCache(),seen=(g.seen||{})[id];
   var tr=function(k,x){return '<tr><td><span class="tag '+(k==='필수'?'need':'opt')+'">'+k+'</span></td><td><b>'+esc(x[0])+'</b></td><td>'+esc(x[1])+'</td><td>'+esc(x[2])+'</td></tr>';};
   return '<details class="gd-box" data-gdprep="'+id+'"'+(seen?'':' open')+'><summary>시작 전 준비물 <small>필수만 있으면 끝까지 할 수 있습니다</small></summary>'+
-    '<div class="tblwrap"><table class="gd-prep"><thead><tr><th>구분</th><th>준비물</th><th>어디서 구하나요</th><th>없으면?</th></tr></thead><tbody>'+
+    '<div class="tblwrap"><table class="gd-prep"><thead><tr><th>구분</th><th>준비물</th><th>어디서 구하나요</th><th>없을 시</th></tr></thead><tbody>'+
     P.need.map(function(x){return tr('필수',x);}).join('')+P.opt.map(function(x){return tr('선택',x);}).join('')+'</tbody></table></div></details>';
 }
 function gdStepsHtml(id){
@@ -7334,7 +7338,8 @@ function phShrink(file){
 function renderPhoto(v){
   var P=PQ();
   v.innerHTML='<h1 class="h-title">사진대지</h1><p class="lead">점검·위험성평가·하자 사진을 올리면 한 장에 3칸씩, 칸에 꽉 차게 정리합니다. 엑셀로 받거나 바로 인쇄(PDF 저장)할 수 있습니다. 휴대폰에서 열면 카메라로 바로 찍어 넣을 수 있습니다.</p>'+
-  '<section class="card"><div class="grid2">'+
+  '<section class="card"><div class="row" style="margin-bottom:.7rem;align-items:center"><span class="muted" style="font-size:.85rem">용도 고르기</span>'+
+    PH_PRE.map(function(x,i){return '<button type="button" class="btn '+(P.l===x.l&&P.r===x.r?'':'ghost ')+'sm" data-act="phpre" data-i="'+i+'">'+esc(x.n)+'</button>';}).join('')+'</div><div class="grid2">'+
     F('제목','photo.title',P.title,{ph:'예: 102·103동 정기안전점검 사진대지'})+
     F('부제(점검일 등)','photo.sub',P.sub,{ph:'예: 점검일 2026. 10. 19. · 대상 102동·103동'})+
     F('왼쪽 사진 이름','photo.l',P.l,{ph:'조치 전 / 전경'})+
@@ -7354,11 +7359,12 @@ function renderPhoto(v){
   bind('#ph-cam',function(e){phAddFiles(e.target.files);e.target.value='';});
   bind('#ph-one',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(f&&phSlot)phPut(phSlot,f);});
 }
+var PH_PRE=[{n:'위험성평가 개선 전·후',l:'개선 전',r:'개선 후',t:'위험성평가 개선 사진대지'},{n:'안전점검 전경·근접',l:'전경',r:'근접',t:'안전점검 사진대지'}];
 var phSlot=null;
 function phPaint(){
   var P=PQ(),box=$('#ph-list');if(!box)return;
   var n=0;P.rows.forEach(function(x){if(x.l)n++;if(x.r)n++;});var c=$('#ph-n');if(c)c.textContent=n+'장 · '+P.rows.length+'줄 · '+Math.max(1,Math.ceil(P.rows.length/3))+'쪽';
-  if(!P.rows.length){box.innerHTML='<p class="muted" style="margin:0">아직 사진이 없습니다. 위의 "사진 넣기"를 누르세요.</p>';return;}
+  if(!P.rows.length){box.innerHTML='<p class="muted" style="margin:0">아직 사진이 없습니다. 위의 "사진 넣기"를 누르세요.</p><p class="muted" style="margin:.4rem 0 0;font-size:.85rem">사진을 넣으면 여기에 줄마다 사진 두 칸과 위치·내용 칸이 생기고, 옆에 ⇄(좌우 바꾸기) ▲▼(순서) 빼기·줄 삭제 버튼이 나옵니다. 칸을 누르면 그 사진만 바꿀 수 있습니다.</p>';return;}
   box.innerHTML=P.rows.map(function(x,i){
     var slot=function(k){return '<button type="button" class="ph-slot" data-act="phpick" data-i="'+i+'" data-k="'+k+'" aria-label="'+(k==='l'?P.l:P.r)+' 사진'+(x[k]?' 바꾸기':' 넣기')+'">'+(x[k]?'<img data-phid="'+x[k]+'" alt="">':'<span>+ '+esc(k==='l'?P.l:P.r)+'</span>')+'</button>';};
     return '<div class="ph-row"><div class="ph-no">'+(i+1)+'</div>'+slot('l')+slot('r')+
@@ -7387,6 +7393,7 @@ function phAct(act,a){
   var P=PQ(),i=+a.dataset.i;
   if(act==='phadd'){$('#ph-file').click();return true;}
   if(act==='phcam'){$('#ph-cam').click();return true;}
+  if(act==='phpre'){var x=PH_PRE[i];if(!x)return true;var old=PH_PRE.some(function(y){return y.t===P.title;});P.l=x.l;P.r=x.r;if(!P.title||old)P.title=x.t;saveNow();renderPhoto($('#view'));guideTop($('#view'),'photo');toast(x.n+' 칸 이름으로 맞췄습니다.');return true;}
   if(act==='phrow'){P.rows.push({l:'',r:'',t:''});save();phPaint();gdSoon();return true;}
   if(act==='phpick'){phSlot={i:i,k:a.dataset.k};$('#ph-one').click();return true;}
   if(act==='phswap'){var x=P.rows[i],t=x.l;x.l=x.r;x.r=t;save();phPaint();return true;}
