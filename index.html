@@ -249,6 +249,28 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .dg-item{display:flex;gap:.6rem;align-items:flex-start;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--line);font-size:.86rem}.dg-item>div{min-width:0;overflow-wrap:anywhere}.dg-item p{margin:.15rem 0 0;color:var(--ink2)}.dg-item .btn,.dg-item>.tag{flex:none}
 .bd-big{font-size:1rem;margin:0 0 .5rem}.bd-res .kt th{width:7.5rem;white-space:nowrap}
 .kt.nw th,.kt.nw td{white-space:nowrap}
+.gd{margin:0 0 1rem}
+.gd-steps{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:.7rem;padding:.55rem .8rem;margin-bottom:.6rem}
+.gd-cnt{font-size:.85rem;color:var(--ink2);white-space:nowrap}.gd-cnt b{color:var(--accent);font-size:1.05rem}
+.gd-steps ol{display:flex;flex-wrap:wrap;gap:.35rem;list-style:none;margin:0;padding:0}
+.gd-steps li{display:flex;align-items:center;gap:.3rem;font-size:.82rem;padding:.2rem .6rem .2rem .25rem;border-radius:1rem;background:var(--surface2);border:1px solid var(--line);color:var(--ink2)}
+.gd-steps li i{font-style:normal;display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border-radius:50%;background:var(--line);color:var(--ink);font-size:.72rem;font-weight:700}
+.gd-steps li.done{background:var(--ok-soft);border-color:transparent;color:var(--ok)}.gd-steps li.done i{background:var(--ok);color:#fff}
+.gd-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:.6rem;align-items:start}
+.gd-box{background:var(--surface);border:1px solid var(--line);border-radius:.7rem;padding:.55rem .8rem}
+.gd-box summary{cursor:pointer;font-weight:600}.gd-box summary small{font-weight:400;color:var(--muted);margin-left:.3rem;font-size:.8rem}
+.gd-prep{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.5rem}.gd-prep th,.gd-prep td{border-bottom:1px solid var(--line);padding:.35rem .4rem;text-align:left;vertical-align:top}.gd-prep th{color:var(--muted);font-weight:500;font-size:.78rem}
+.gd-prep .tag{margin-left:0}.tag.need{background:var(--warn-soft);color:var(--warn)}.tag.opt{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+.gd-law{list-style:none;margin:.5rem 0 0;padding:0;font-size:.85rem}.gd-law li{padding:.25rem 0;border-bottom:1px dashed var(--line)}
+.gd-ok{color:var(--ok);white-space:nowrap}.gd-w{color:var(--warn)}
+.gd-fin summary{cursor:pointer}.gd-fin summary small{color:var(--muted);margin-left:.3rem}.gd-fin ul{list-style:none;margin:.6rem 0 0;padding:0}
+.gd-fin li{display:flex;justify-content:space-between;gap:.8rem;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.88rem}.gd-fin li label{display:flex;gap:.45rem;align-items:flex-start}.gd-fin li small{flex:none;color:var(--accent);font-size:.78rem;max-width:40%;text-align:right}
+.ph-row{display:grid;grid-template-columns:2rem minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:.5rem;align-items:start;padding:.6rem 0;border-bottom:1px solid var(--line)}
+.ph-no{font-weight:700;color:var(--muted);text-align:center;padding-top:.4rem}
+.ph-slot{display:block;width:100%;aspect-ratio:228/248;border:1px dashed var(--line);border-radius:.5rem;background:var(--surface2);padding:0;overflow:hidden;cursor:pointer;color:var(--muted);font:inherit;font-size:.85rem}
+.ph-slot img{width:100%;height:100%;object-fit:cover;display:block}
+.ph-txt textarea{width:100%;margin-bottom:.3rem}
+@media (max-width:640px){.gd-prep td:nth-child(2){min-width:5.5rem}.gd-prep th:first-child,.gd-prep td:first-child{padding-right:.1rem}.ph-row{grid-template-columns:1.6rem 1fr 1fr}.ph-txt{grid-column:2/4}.gd-fin li{flex-direction:column;gap:.15rem}.gd-fin li small{max-width:none;text-align:left;padding-left:1.6rem}}
 </style>
 </head>
 <body>
@@ -2215,7 +2237,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.27.2';
+var APP_VER='1.28.0';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -2234,6 +2256,7 @@ function defaultState(){
     bids:[bidDefault()],bidCur:0,
     elect:electDefault(),
     ltm:ltmDefault(),
+    photo:phDefault(),gd:{},
     ui:{font:'m',doc:'notice',bk:''}
   };
 }
@@ -2951,7 +2974,8 @@ var TABS=[
   {id:'longterm',t:'장기수선'},
   {id:'sys',t:'설비 계통도'},
   {id:'bid',t:'입찰·계약'},
-  {id:'elect',t:'선거'}
+  {id:'elect',t:'선거'},
+  {id:'photo',t:'사진대지'}
 ];
 var tab='home';
 function fontPx(){return {s:15,m:17,l:19,xl:22}[state.ui.font]||17;}
@@ -2976,6 +3000,9 @@ function shell(){
   v.addEventListener('input',onInput);
   v.addEventListener('click',onClick);
   v.addEventListener('paste',onPaste);
+  v.addEventListener('toggle',gdToggle,true);
+  v.addEventListener('click',function(){gdSoon();});
+  v.addEventListener('change',function(){gdSoon();});
   v.addEventListener('focusout',function(e){if(e.target.closest&&e.target.closest('#spdoc'))saveNow();});
   paintFont();updateChip();
 }
@@ -2987,7 +3014,8 @@ function go(id,noHash){
   tab=id;
   $$('#tabs button').forEach(function(b){if(b.dataset.tab===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   var v=$('#view');
-  ({home:renderHome,cal:renderCal,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm,sys:renderSys}[id]||renderSoon)(v,id);
+  ({home:renderHome,cal:renderCal,agenda:renderAgenda,risk:renderRisk,safety:renderSafety,rules:renderRules,bid:renderBid,elect:renderElect,longterm:renderLongterm,sys:renderSys,photo:renderPhoto}[id]||renderSoon)(v,id);
+  try{guideTop(v,id);}catch(e){}
   if(!noHash){try{history.replaceState(null,'','#'+id);}catch(e){}}
   window.scrollTo(0,0);
 }
@@ -7139,9 +7167,344 @@ function renderSoon(v,id){
   '<div class="row" style="margin-top:1rem"><button type="button" class="btn" data-go="agenda">안건·공고로 가기</button><button type="button" class="btn ghost" data-go="safety">안전관리계획으로 가기</button></div>';
 }
 
+/* ───────── 초보 도움: 준비물 표 · 진행판 · 법령 기준일 · 마무리 점검표 ───────── */
+/* 준비물: [준비물, 어디서 구하나요, 없으면?] */
+var GD_PREP={
+  cal:{need:[['단지 기본 정보','홈 → 처음 설정(단지 찾기 → K-apt에서 가져오기)','기한 계산에 쓰는 세대수·승강기 등이 비어 일부 업무가 빠집니다']],
+    opt:[['업무별 최근 시행일','점검 보고서·필증·계약서','그 업무는 "최근 시행일 입력 필요"로 남고 기한이 계산되지 않습니다'],['K-apt 계약 정보','자동(단지코드가 있으면 불러옴)','계약 만료일을 손으로 넣습니다']]},
+  agenda:{need:[['회의 일시·장소','입대의 회장과 정한 내용','공고문 날짜가 빈칸으로 나옵니다'],['안건 제목','회의 자료','안건 없는 공고문이 됩니다']],
+    opt:[['입대의 위원 명단','홈 → 입주자대표회의 위원','회의록 참석자 칸을 손으로 채웁니다'],['의결 결과','회의가 끝난 뒤','결과공고·회의록은 회의 후에 만들면 됩니다']]},
+  safety:{need:[['단지명·관리소장 이름','홈 → 단지 정보','계획서 표지가 빈칸으로 나옵니다']],
+    opt:[['기존 안전관리계획서·도면·점검 보고서','관리사무소 보관 파일','계획서 칸을 하나씩 눌러 직접 채웁니다'],['조직도','사무실에 걸린 조직도 사진도 됩니다','안전관리자·책임자 칸을 직접 씁니다'],['Claude 앱(폴더 연결)','Claude 데스크톱 앱','자료 찾기·채우기 문장 대신 칸을 직접 고칩니다']]},
+  risk:{need:[['구글 계정','gmail 계정이면 됩니다','구글시트판을 설치할 수 없습니다'],['구글시트판 웹앱 주소','설치 안내서 마지막 단계에서 받은 주소','이 메뉴에서 시트를 열 수 없습니다(시트는 구글 드라이브에서 직접 열어도 됩니다)']],
+    opt:[['허브 연결 키','시트 메뉴 [안전관리] → [허브 연결 키 보기]','홈·이 화면에 이번 달 현황이 나오지 않을 뿐 시트는 그대로 씁니다'],['휴대폰','현장 사진·QR 신고용','사진은 나중에 PC에서 올려도 됩니다']]},
+  rules:{need:[['현행 관리규약','한글·워드·글자 있는 PDF 파일, 또는 한글에서 전체 복사','개정 비교표를 만들 수 없습니다']],
+    opt:[['시·도 관리규약 준칙','시·도 누리집(준칙 전문 복사)','준칙 대조만 빠지고 나머지는 됩니다'],['세대수','홈 → 단지 정보(K-apt)','동의 기준 세대수를 직접 넣습니다'],['입대의 의결일·공고일','회의 일정','절차·기한 계산이 비어 있습니다']]},
+  longterm:{need:[['사용검사일·총공급면적','기존 계획서 앞쪽·K-apt','충당금·평준화 계산을 할 수 없습니다']],
+    opt:[['기존 장기수선계획서','한글·PDF·엑셀 파일','별표1로 새로 시작합니다(글자 없는 스캔이면 빈 엑셀 양식에 옮겨 적기)'],['단가표·견적서','경기도 셀프견적·업체 견적','계획서 단가를 그대로 씁니다'],['충당금 잔액과 기준일','결산서·적립현황','재원 평준화를 하지 않습니다']]},
+  bid:{need:[['사업 종류와 추정 금액','견적·기존 계약서','수의계약 여부·선정 주체를 판정할 수 없습니다']],
+    opt:[['입대의 의결 내용','낙찰방법·참가자격·예정금액','판정 결과의 기본값으로 초안을 만듭니다'],['현 계약 만료일','기존 계약서','일정을 거꾸로 계산하지 못합니다'],['K-apt 등록','공동인증서(등록은 소장님이 직접)','공고문 파일은 그대로 받을 수 있습니다']]},
+  elect:{need:[['현 동별 대표자 임기 만료일','선출 공고·당선 확인 서류','선거 일정을 계산할 수 없습니다'],['선거구와 선거구별 세대수','관리규약 별표·세대 명부','당선 기준표가 비어 있습니다']],
+    opt:[['관리규약의 선거 기간 조항','관리규약 선거관리 규정','기본값(화면에 표시)으로 계산합니다'],['선관위원 명단','선관위 구성 서류','공고문에 이름이 빈칸으로 나옵니다']]},
+  photo:{need:[['사진','휴대폰 카메라 또는 PC에 있는 사진 파일','-']],
+    opt:[['제목·점검일','점검표','제목 없이 사진대지만 만듭니다'],['위치·내용','점검표·결함 기록','글 칸을 비워 두고 출력 후 손으로 적어도 됩니다']]}
+};
+/* 진행판: [이름, 끝났는지] */
+function gdSteps(id){
+  var s=state,has=function(x){return x!==undefined&&x!==null&&String(x).trim()!=='';};
+  if(id==='agenda'){var m=s.meeting;return [['회의 정보',has(m.date)&&has(m.place)],['안건 '+s.agendas.length+'건',s.agendas.some(function(a){return has(a.title);})],['개최공고일',has(m.noticeDate)],['결과공고일',has(m.resultDate)]];}
+  if(id==='safety'){var sf=s.safety,nh=0,tot=0,ne=Object.keys(sf.edits||{}).length;SP_DOCS.forEach(function(g){g[1].forEach(function(d){tot++;if((sf.have||{})[d[0]])nh++;});});
+    return [['단지 정보',has(s.complex.name)&&!/○○/.test(s.complex.name)&&has(s.complex.director)],['준비물 '+nh+'/'+tot,tot>0&&nh>=Math.ceil(tot/2)],['계획서 '+ne+'칸 고침',ne>0],['저장'+(sf.savedAt?' '+sf.savedAt.slice(5).replace('-','.'):''),has(sf.savedAt)]];}
+  if(id==='rules'){var r=R(),p=r.proc;return [['현행 규약',!!r.base],['개정 조문 '+r.am.length+'개',r.am.length>0],['의결·공고일',has(p.boardDate)&&has(p.noticeDate)],['투표 결과',has(p.tYes)],['확정일',has(p.fixDate)]];}
+  if(id==='bid'){var b=BQ();return [['사업·금액',has(b.amt)],['입대의 의결일',has(b.boardDate)],['공고·마감일',has(b.noticeDate)&&has(b.dueDate)],['선정·계약',has(b.decDate)||has(b.conDate)]];}
+  if(id==='elect'){var e=EQ();return [['임기 만료일',has(e.end)],['선거구',(e.rows||[]).some(function(x){return has(x.u);})],['선출공고일',has(e.noticeDate)],['투표일',has(e.voteStart)],['임원 선출일',has(e.offDate)]];}
+  if(id==='photo'){var P=PQ(),np=0;P.rows.forEach(function(x){if(x.l)np++;if(x.r)np++;});return [['제목',has(P.title)],['사진 '+np+'장',np>0],['위치·내용',P.rows.length>0&&P.rows.every(function(x){return has(x.t);})],['저장'+(P.savedAt?' '+P.savedAt.slice(5).replace('-','.'):''),has(P.savedAt)]];}
+  return null;
+}
+/* 법령 기준일: 이 메뉴를 그 시행본과 맞춰 본 날짜(YYYYMMDD). 빈 값 = 새 개정본 반영 검토 전 */
+var GD_LAWBASE={
+  '공동주택관리법':{d:'20260701'},'공동주택관리법 시행령':{d:'20260701'},'공동주택관리법 시행규칙':{d:'20260730'},
+  '산업안전보건법':{d:'20261027'},'산업안전보건법 시행령':{d:'20260801'},'산업안전보건법 시행규칙':{d:'20260801'},
+  '사업장 위험성평가에 관한 지침':{d:'',a:1,note:'2026.11.4. 전부개정(고시 제2026-73호) — 구글시트판 반영 검토 전'},
+  '주택관리업자 및 사업자 선정지침':{d:'20240411',a:1}
+};
+var GD_LAWS={
+  cal:['공동주택관리법','공동주택관리법 시행령','공동주택관리법 시행규칙'],
+  agenda:['공동주택관리법 시행령'],
+  safety:['공동주택관리법','공동주택관리법 시행령','공동주택관리법 시행규칙'],
+  risk:['산업안전보건법','산업안전보건법 시행령','산업안전보건법 시행규칙','사업장 위험성평가에 관한 지침'],
+  rules:['공동주택관리법','공동주택관리법 시행령'],
+  longterm:['공동주택관리법','공동주택관리법 시행령','공동주택관리법 시행규칙'],
+  bid:['공동주택관리법 시행령','주택관리업자 및 사업자 선정지침'],
+  elect:['공동주택관리법','공동주택관리법 시행령']
+};
+/* 마무리 점검표: [할 일, 근거] — 조문은 법제처 현행본(2026.11.27. 확인) */
+var GD_FIN={
+  safety:[
+    ['대상 시설이 모두 들어갔다: 가스, 중앙난방, 발전·변전, 위험물 저장, 소방·피난·방화, 승강기, 연탄가스배출기, 주차장','영 제33조제1항'],
+    ['국토부령 시설도 들어갔다: 석축·옹벽·담장·맨홀·정화조·하수도, 옥상·계단 난간, 우물·비상저수시설, 펌프실·전기실·기계실, 경로당·어린이놀이터 시설, 지능형 홈네트워크 설비, 주민운동시설, 주민휴게시설','규칙 제11조제1항'],
+    ['시설별 안전관리자·안전관리책임자를 정해 책임점검 사항을 적었다','법 제32조제1항, 영 제33조제2항제1호'],
+    ['시설별 안전관리 기준·진단사항(별표 2)을 적었다','영 제33조제2항제2호, 규칙 제11조제2항'],
+    ['위해 우려 시설의 이용제한·보수 등 조치 사항을 적었다','영 제33조제2항제3호'],
+    ['지하주차장 침수 예방·대응 사항을 적었다','영 제33조제2항제4호'],
+    ['계획의 조정에 관한 사항을 적었다','영 제33조제2항제5호'],
+    ['경비원과 안전관리자·책임자가 구청장이 실시하는 방범·안전교육을 받도록 일정을 잡았다','법 제32조제2항']
+  ],
+  risk:[
+    ['평가 시기를 지켰다: 최초평가, 그다음 해부터 매년 정기평가, 새 위험·사고 때 수시평가','산안법 시행규칙 제37조제2항'],
+    ['유해·위험요인 파악 → 위험성 수준 결정 → 개선대책 수립·이행 순서로 했다','시행규칙 제37조제1항'],
+    ['근로자를 참여시켰다(사업장 순회점검이 원칙, 설문·면담 병행 가능)','법 제36조, 시행규칙 제37조의2'],
+    ['실시 전에 일정을, 실시 후에 결과(위험요인·수준·개선대책·이행 결과)를 근로자에게 알렸다','시행규칙 제37조의3'],
+    ['기록에 실시 시기·담당자, 참여 근로자·근로자대표, 결과를 남겼다','시행규칙 제37조의4제1항'],
+    ['기록을 3년간 보존한다','시행규칙 제37조의4제2항']
+  ]
+};
+function gdLawCache(){if(!state.gd)state.gd={};return state.gd;}
+function gdFmt(d){d=String(d||'');return d.length===8?d.slice(0,4)+'. '+(+d.slice(4,6))+'. '+(+d.slice(6))+'.':d;}
+function gdLawHtml(id){
+  var L=GD_LAWS[id];if(!L)return '';
+  var g=gdLawCache(),res=g.law||{},at=g.lawAt||'';
+  var rows=L.map(function(n){var B=GD_LAWBASE[n]||{},c=res[n],st;
+    if(c&&c.d){st=!B.d?'<span class="gd-w">⚠ '+esc(B.note||'반영 검토 전')+'</span>':c.d>B.d?'<span class="gd-w">⚠ '+gdFmt(c.d)+' 시행본이 새로 나왔습니다 — 확인 필요</span>':'<span class="gd-ok">✅ 같음</span>';}
+    else st=!B.d?'<span class="gd-w">⚠ '+esc(B.note||'반영 검토 전')+'</span>':'<span class="muted">확인 전</span>';
+    return '<li><b>'+esc(n)+'</b> <span class="muted">'+(B.d?gdFmt(B.d)+' 시행본 기준':'')+'</span> '+st+'</li>';}).join('');
+  return '<details class="gd-box" id="gd-law"'+(g.lawOpen?' open':'')+'><summary>법령 기준일 <small>이 메뉴가 어느 법령 시행본에 맞춰져 있는지</small></summary>'+
+    '<ul class="gd-law">'+rows+'</ul><div class="row" style="margin-top:.4rem"><button type="button" class="btn ghost sm" data-act="gdlaw">지금 현행 법령과 맞춰 보기</button><span class="muted" id="gd-lawmsg" style="font-size:.82rem">'+(at?esc(at)+' 확인':'')+'</span></div></details>';
+}
+function gdPrepHtml(id){
+  var P=GD_PREP[id];if(!P)return '';
+  var g=gdLawCache(),seen=(g.seen||{})[id];
+  var tr=function(k,x){return '<tr><td><span class="tag '+(k==='필수'?'need':'opt')+'">'+k+'</span></td><td><b>'+esc(x[0])+'</b></td><td>'+esc(x[1])+'</td><td>'+esc(x[2])+'</td></tr>';};
+  return '<details class="gd-box" data-gdprep="'+id+'"'+(seen?'':' open')+'><summary>시작 전 준비물 <small>필수만 있으면 끝까지 할 수 있습니다</small></summary>'+
+    '<div class="tblwrap"><table class="gd-prep"><thead><tr><th>구분</th><th>준비물</th><th>어디서 구하나요</th><th>없으면?</th></tr></thead><tbody>'+
+    P.need.map(function(x){return tr('필수',x);}).join('')+P.opt.map(function(x){return tr('선택',x);}).join('')+'</tbody></table></div></details>';
+}
+function gdStepsHtml(id){
+  var S=gdSteps(id);if(!S)return '';
+  var n=S.filter(function(x){return x[1];}).length;
+  return '<div class="gd-steps" id="gd-steps" aria-label="진행 상황"><span class="gd-cnt">진행 <b>'+n+'</b>/'+S.length+'</span><ol>'+
+    S.map(function(x,i){return '<li class="'+(x[1]?'done':'')+'"><i>'+(x[1]?'✓':(i+1))+'</i>'+esc(x[0])+'</li>';}).join('')+'</ol></div>';
+}
+function gdFinHtml(id){
+  var F=GD_FIN[id];if(!F)return '';
+  var g=gdLawCache(),ck=(g.fin||{})[id]||{},n=F.filter(function(x,i){return ck[i];}).length;
+  return '<details class="card gd-fin" id="gd-fin"'+(n?' open':'')+'><summary><b>마무리 점검표</b> <small>'+n+'/'+F.length+' · 빠진 절차가 없는지 근거 조문과 함께 확인</small></summary><ul>'+
+    F.map(function(x,i){return '<li><label><input type="checkbox" data-gdfin="'+id+'" data-i="'+i+'"'+(ck[i]?' checked':'')+'> <span>'+esc(x[0])+'</span></label><small>'+esc(x[1])+'</small></li>';}).join('')+
+    '</ul><p class="muted" style="margin:.4rem 0 0;font-size:.8rem">근거는 법제처 현행 법령(2026. 11. 27. 확인)입니다. 법령 기준일에 ⚠가 나오면 조문이 바뀌었는지 먼저 확인하세요.</p></details>';
+}
+function guideTop(v,id){
+  if(!GD_PREP[id]&&!GD_LAWS[id]&&!GD_FIN[id])return;
+  var lead=v.querySelector('.lead')||v.querySelector('.h-title');if(!lead)return;
+  var top=gdStepsHtml(id)+'<div class="gd-row">'+gdPrepHtml(id)+gdLawHtml(id)+'</div>';
+  lead.insertAdjacentHTML('afterend','<div class="gd" id="gd-top">'+top+'</div>');
+  if(GD_FIN[id])v.insertAdjacentHTML('beforeend',gdFinHtml(id));
+}
+var gdT=null;
+function gdSoon(){clearTimeout(gdT);gdT=setTimeout(function(){var el=$('#gd-steps');if(!el)return;var h=gdStepsHtml(tab);if(h&&el.outerHTML!==h)el.outerHTML=h;},250);}
+function gdToggle(e){
+  var d=e.target;if(!d||d.tagName!=='DETAILS')return;
+  var g=gdLawCache();
+  if(d.dataset&&d.dataset.gdprep){g.seen=g.seen||{};if(!d.open){g.seen[d.dataset.gdprep]=1;save();}else if(g.seen[d.dataset.gdprep]){delete g.seen[d.dataset.gdprep];save();}}
+  if(d.id==='gd-law'){g.lawOpen=d.open?1:0;save();}
+}
+function gdChange(e){
+  var el=e.target;if(!el||!el.dataset||el.dataset.gdfin===undefined)return false;
+  var g=gdLawCache();g.fin=g.fin||{};var m=g.fin[el.dataset.gdfin]=g.fin[el.dataset.gdfin]||{};
+  if(el.checked)m[el.dataset.i]=1;else delete m[el.dataset.i];save();
+  var s=$('#gd-fin small');if(s){var F=GD_FIN[el.dataset.gdfin];s.textContent=Object.keys(m).length+'/'+F.length+' · 빠진 절차가 없는지 근거 조문과 함께 확인';}
+  return true;
+}
+function gdAct(act){
+  if(act!=='gdlaw')return false;
+  var api=String(state.kapt.api||'').trim().replace(/\/+$/,''),msg=$('#gd-lawmsg');
+  if(!api){if(msg)msg.textContent='홈 → 연결 설정에 통로 서버 주소가 없습니다.';return true;}
+  var names=GD_LAWS[tab]||[];if(msg)msg.textContent='법제처에서 현행 시행일을 확인하는 중…';
+  fetch(api+'/api/lawdates?q='+encodeURIComponent(names.join('|'))).then(function(r){return r.json();}).then(function(j){
+    if(!j||!j.ok||!j.laws)throw new Error((j&&j.error)||'응답 없음');
+    var g=gdLawCache();g.law=g.law||{};Object.keys(j.laws).forEach(function(n){g.law[n]={d:j.laws[n].date||''};});
+    var dt=new Date();g.lawAt=dt.getFullYear()+'. '+(dt.getMonth()+1)+'. '+dt.getDate()+'.';g.lawOpen=1;saveNow();
+    var box=$('#gd-law');if(box)box.outerHTML=gdLawHtml(tab);
+    var bad=names.filter(function(n){var B=GD_LAWBASE[n]||{},c=g.law[n];return c&&c.d&&(!B.d||c.d>B.d);});
+    toast(bad.length?'확인이 필요한 법령이 '+bad.length+'개 있습니다.':'모두 이 메뉴의 기준 시행본과 같습니다.');
+  }).catch(function(e){var m=String(e&&e.message||e);
+    if(msg)msg.textContent=/not found/.test(m)?'통로 서버가 예전 버전입니다. kapt-hub 워커를 새 코드로 바꾸면 됩니다.':/LAW_OC/.test(m)?'통로 서버에 법제처 인증값(LAW_OC)이 없습니다.':/Failed to fetch|NetworkError|Load failed/i.test(m)?'통로 서버에 연결하지 못했습니다.':'확인하지 못했습니다: '+m;});
+  return true;
+}
+
+/* ───────── 사진대지 ───────── */
+function phDefault(){return {title:'',sub:'',l:'조치 전',r:'조치 후',rows:[],savedAt:''};}
+function PQ(){if(!state.photo||!state.photo.rows)state.photo=merge(phDefault(),state.photo||{});return state.photo;}
+var phURL={};
+function phNewId(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function phImg(id){
+  if(!id)return Promise.resolve(null);
+  if(phURL[id])return Promise.resolve(phURL[id]);
+  return idbGet('ph:'+id).then(function(b){if(!b)return null;phURL[id]=URL.createObjectURL(b);return phURL[id];});
+}
+function phShrink(file){
+  return new Promise(function(ok,no){
+    var u=URL.createObjectURL(file),im=new Image();
+    im.onload=function(){var M=1600,w=im.naturalWidth,h=im.naturalHeight,s=Math.min(1,M/Math.max(w,h));
+      var c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      URL.revokeObjectURL(u);c.toBlob(function(b){b?ok(b):no(new Error('사진 변환 실패'));},'image/jpeg',0.85);};
+    im.onerror=function(){URL.revokeObjectURL(u);no(new Error('사진을 열 수 없습니다'));};
+    im.src=u;
+  });
+}
+function renderPhoto(v){
+  var P=PQ();
+  v.innerHTML='<h1 class="h-title">사진대지</h1><p class="lead">점검·위험성평가·하자 사진을 올리면 한 장에 3칸씩, 칸에 꽉 차게 정리합니다. 엑셀로 받거나 바로 인쇄(PDF 저장)할 수 있습니다. 휴대폰에서 열면 카메라로 바로 찍어 넣을 수 있습니다.</p>'+
+  '<section class="card"><div class="grid2">'+
+    F('제목','photo.title',P.title,{ph:'예: 102·103동 정기안전점검 사진대지'})+
+    F('부제(점검일 등)','photo.sub',P.sub,{ph:'예: 점검일 2026. 10. 19. · 대상 102동·103동'})+
+    F('왼쪽 사진 이름','photo.l',P.l,{ph:'조치 전 / 전경'})+
+    F('오른쪽 사진 이름','photo.r',P.r,{ph:'조치 후 / 근접'})+
+  '</div><div class="row" style="margin-top:.6rem">'+
+    '<button type="button" class="btn" data-act="phadd">사진 넣기 (여러 장)</button>'+
+    '<button type="button" class="btn ghost" data-act="phcam">카메라로 찍기</button>'+
+    '<button type="button" class="btn ghost" data-act="phrow">빈 줄 추가</button>'+
+  '</div><p class="muted" style="margin:.5rem 0 0;font-size:.85rem">사진은 왼쪽 → 오른쪽, 위 → 아래 빈칸에 차례로 들어갑니다. 칸을 눌러 바꾸거나, ⇄로 좌우를 바꿀 수 있습니다. 사진은 이 브라우저에만 보관되고 밖으로 나가지 않습니다(자동 저장 파일에는 들어가지 않습니다).</p>'+
+  '<input type="file" id="ph-file" accept="image/*" multiple hidden><input type="file" id="ph-cam" accept="image/*" capture="environment" hidden><input type="file" id="ph-one" accept="image/*" hidden></section>'+
+  '<section class="card"><h2>사진 <small id="ph-n"></small></h2><div id="ph-list"></div></section>'+
+  '<section class="card"><h2>받기</h2><div class="row"><button type="button" class="btn" data-act="phxlsx">엑셀로 받기 (.xlsx)</button><button type="button" class="btn ghost" data-act="phprint">인쇄 / PDF로 저장</button>'+
+  '<button type="button" class="btn danger sm" data-act="phclear">사진 모두 지우기</button></div><p class="muted" id="ph-msg" style="margin:.4rem 0 0;font-size:.85rem"></p></section>';
+  phPaint();
+  var bind=function(sel,fn){var el=$(sel);if(el)el.addEventListener('change',fn);};
+  bind('#ph-file',function(e){phAddFiles(e.target.files);e.target.value='';});
+  bind('#ph-cam',function(e){phAddFiles(e.target.files);e.target.value='';});
+  bind('#ph-one',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(f&&phSlot)phPut(phSlot,f);});
+}
+var phSlot=null;
+function phPaint(){
+  var P=PQ(),box=$('#ph-list');if(!box)return;
+  var n=0;P.rows.forEach(function(x){if(x.l)n++;if(x.r)n++;});var c=$('#ph-n');if(c)c.textContent=n+'장 · '+P.rows.length+'줄 · '+Math.max(1,Math.ceil(P.rows.length/3))+'쪽';
+  if(!P.rows.length){box.innerHTML='<p class="muted" style="margin:0">아직 사진이 없습니다. 위의 "사진 넣기"를 누르세요.</p>';return;}
+  box.innerHTML=P.rows.map(function(x,i){
+    var slot=function(k){return '<button type="button" class="ph-slot" data-act="phpick" data-i="'+i+'" data-k="'+k+'" aria-label="'+(k==='l'?P.l:P.r)+' 사진'+(x[k]?' 바꾸기':' 넣기')+'">'+(x[k]?'<img data-phid="'+x[k]+'" alt="">':'<span>+ '+esc(k==='l'?P.l:P.r)+'</span>')+'</button>';};
+    return '<div class="ph-row"><div class="ph-no">'+(i+1)+'</div>'+slot('l')+slot('r')+
+      '<div class="ph-txt"><textarea data-bind="photo.rows.'+i+'.t" rows="4" placeholder="위치·내용 (예: 102동 옥상 방수층, 들뜸 없음)">'+esc(x.t||'')+'</textarea>'+
+      '<div class="row" style="gap:.25rem"><button type="button" class="btn ghost sm" data-act="phswap" data-i="'+i+'" title="좌우 바꾸기">⇄</button><button type="button" class="btn ghost sm" data-act="phup" data-i="'+i+'">▲</button><button type="button" class="btn ghost sm" data-act="phdown" data-i="'+i+'">▼</button>'+
+      (x.l?'<button type="button" class="btn ghost sm" data-act="phrm" data-i="'+i+'" data-k="l">왼쪽 빼기</button>':'')+(x.r?'<button type="button" class="btn ghost sm" data-act="phrm" data-i="'+i+'" data-k="r">오른쪽 빼기</button>':'')+
+      '<button type="button" class="btn danger sm" data-act="phdel" data-i="'+i+'">줄 삭제</button></div></div></div>';
+  }).join('');
+  $$('#ph-list img[data-phid]').forEach(function(im){phImg(im.dataset.phid).then(function(u){if(u)im.src=u;else im.alt='사진 없음';});});
+}
+function phAddFiles(files){
+  files=Array.prototype.slice.call(files||[]);if(!files.length)return;
+  var P=PQ(),msg=$('#ph-msg');toast('사진 '+files.length+'장을 넣는 중…');
+  var chain=Promise.resolve(),added=0;
+  files.forEach(function(f){chain=chain.then(function(){return phShrink(f).then(function(b){var id=phNewId();return idbSet('ph:'+id,b).then(function(ok){if(!ok)throw new Error('저장 공간이 부족합니다');
+    var r=P.rows.find(function(x){return !x.l||!x.r;});if(!r){r={l:'',r:'',t:''};P.rows.push(r);}
+    if(!r.l)r.l=id;else r.r=id;added++;});}).catch(function(e){if(msg)msg.textContent=f.name+': '+(e.message||e);});});});
+  chain.then(function(){saveNow();phPaint();gdSoon();toast('사진 '+added+'장을 넣었습니다.');});
+}
+function phPut(sl,f){
+  var P=PQ(),row=P.rows[sl.i];if(!row)return;
+  phShrink(f).then(function(b){var id=phNewId();return idbSet('ph:'+id,b).then(function(){var old=row[sl.k];row[sl.k]=id;if(old)phDrop(old);saveNow();phPaint();gdSoon();});}).catch(function(e){toast(String(e.message||e));});
+}
+function phDrop(id){if(phURL[id]){URL.revokeObjectURL(phURL[id]);delete phURL[id];}idbDel('ph:'+id);}
+function phAct(act,a){
+  var P=PQ(),i=+a.dataset.i;
+  if(act==='phadd'){$('#ph-file').click();return true;}
+  if(act==='phcam'){$('#ph-cam').click();return true;}
+  if(act==='phrow'){P.rows.push({l:'',r:'',t:''});save();phPaint();gdSoon();return true;}
+  if(act==='phpick'){phSlot={i:i,k:a.dataset.k};$('#ph-one').click();return true;}
+  if(act==='phswap'){var x=P.rows[i],t=x.l;x.l=x.r;x.r=t;save();phPaint();return true;}
+  if(act==='phup'&&i>0){var u=P.rows[i];P.rows[i]=P.rows[i-1];P.rows[i-1]=u;save();phPaint();return true;}
+  if(act==='phdown'&&i<P.rows.length-1){var d=P.rows[i];P.rows[i]=P.rows[i+1];P.rows[i+1]=d;save();phPaint();return true;}
+  if(act==='phrm'){var k=a.dataset.k;phDrop(P.rows[i][k]);P.rows[i][k]='';save();phPaint();gdSoon();return true;}
+  if(act==='phdel'){var rw=P.rows[i];if(rw.l)phDrop(rw.l);if(rw.r)phDrop(rw.r);P.rows.splice(i,1);save();phPaint();gdSoon();return true;}
+  if(act==='phclear'){if(!confirm('사진대지의 사진과 글을 모두 지울까요? (되돌릴 수 없습니다)'))return true;P.rows.forEach(function(x){if(x.l)phDrop(x.l);if(x.r)phDrop(x.r);});P.rows=[];P.savedAt='';saveNow();phPaint();gdSoon();return true;}
+  if(act==='phxlsx'){phXlsx();return true;}
+  if(act==='phprint'){phPrint();return true;}
+  return false;
+}
+function phMark(){var P=PQ(),d=new Date();P.savedAt=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');saveNow();gdSoon();}
+function phName(){var P=PQ();return (P.title||'사진대지').replace(/[\\\/:*?"<>|]/g,'').trim()||'사진대지';}
+/* 칸 비율(가로 228 : 세로 248)에 맞춰 가운데를 잘라 낸다 */
+var PH_W=228,PH_H=248;
+function phCrop(id){
+  return idbGet('ph:'+id).then(function(b){if(!b)return null;return new Promise(function(ok){
+    var u=URL.createObjectURL(b),im=new Image();
+    im.onload=function(){var W=PH_W*2,H=PH_H*2,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
+      var s=Math.max(W/im.naturalWidth,H/im.naturalHeight),dw=im.naturalWidth*s,dh=im.naturalHeight*s;x.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);
+      URL.revokeObjectURL(u);c.toBlob(function(bb){ok(bb);},'image/jpeg',0.85);};
+    im.onerror=function(){URL.revokeObjectURL(u);ok(null);};im.src=u;});});
+}
+function phPrint(){
+  var P=PQ();if(!P.rows.length){toast('사진이 없습니다.');return;}
+  var w=window.open('','_blank');if(!w){toast('새 창이 막혔습니다. 팝업 차단을 풀어 주세요.');return;}
+  w.document.write('<p style="font-family:sans-serif">사진대지를 준비하는 중…</p>');
+  var ids=[];P.rows.forEach(function(x){if(x.l)ids.push(x.l);if(x.r)ids.push(x.r);});
+  var map={};
+  Promise.all(ids.map(function(id){return phCrop(id).then(function(b){if(!b)return;return new Promise(function(ok){var fr=new FileReader();fr.onload=function(){map[id]=fr.result;ok();};fr.readAsDataURL(b);});});})).then(function(){
+    var pages=[];for(var i=0;i<P.rows.length;i+=3)pages.push(P.rows.slice(i,i+3).map(function(x,j){return {x:x,n:i+j+1};}));
+    var cell=function(id){return '<td class="im">'+(id&&map[id]?'<img src="'+map[id]+'">':'')+'</td>';};
+    var html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>'+esc(phName())+'</title><style>@page{size:A4;margin:12mm}body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;margin:0;color:#111}'+
+      '.pg{page-break-after:always}.pg:last-child{page-break-after:auto}h1{text-align:center;font-size:18pt;margin:0 0 3mm}.sub{text-align:center;border:1px solid #999;background:#fff6dc;padding:1.5mm;font-size:9.5pt;margin-bottom:4mm}'+
+      'table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4mm}th,td{border:1px solid #777;font-size:9pt}th{background:#e6e6e6;height:6mm}td.no{width:8mm;text-align:center}td.im{height:64mm;padding:1mm}td.im img{width:100%;height:64mm;object-fit:cover;display:block}td.tx{vertical-align:top;padding:1.5mm;white-space:pre-wrap;width:27%}</style></head><body>'+
+      pages.map(function(pg){return '<div class="pg"><h1>'+esc(P.title||'사진대지')+'</h1>'+(P.sub?'<div class="sub">'+esc(P.sub)+'</div>':'')+
+        pg.map(function(o){return '<table><tr><th style="width:8mm">No</th><th>'+esc(P.l)+'</th><th>'+esc(P.r)+'</th><th style="width:27%">위치·내용</th></tr><tr><td class="no">'+o.n+'</td>'+cell(o.x.l)+cell(o.x.r)+'<td class="tx">'+esc(o.x.t||'')+'</td></tr></table>';}).join('')+'</div>';}).join('')+
+      '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+    w.document.open();w.document.write(html);w.document.close();phMark();
+  });
+}
+function phXml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function phXlsx(){
+  var P=PQ();if(!P.rows.length){toast('사진이 없습니다.');return;}
+  if(typeof JSZip==='undefined'){toast('엑셀 부품이 준비되지 않았습니다. 인터넷 연결을 확인해 주세요.');return;}
+  var msg=$('#ph-msg');if(msg)msg.textContent='엑셀을 만드는 중…';
+  var imgs=[],jobs=[];
+  P.rows.forEach(function(x,ri){['l','r'].forEach(function(k,ci){if(x[k])jobs.push(phCrop(x[k]).then(function(b){if(b)imgs.push({b:b,ri:ri,ci:ci});}));});});
+  Promise.all(jobs).then(function(){
+    imgs.sort(function(a,b){return a.ri-b.ri||a.ci-b.ci;});
+    var z=new JSZip(),rowsXml=[],merges=[],brk=[],r=1,anchor=[],EMU=9525,M=4;
+    var c=function(ref,s,v){return v===''||v==null?'<c r="'+ref+'" s="'+s+'"/>':'<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+phXml(v)+'</t></is></c>';};
+    var blockTop={};
+    for(var p=0;p<P.rows.length;p+=3){
+      if(p>0)brk.push(r-1);
+      rowsXml.push('<row r="'+r+'" ht="30" customHeight="1">'+c('A'+r,1,P.title||'사진대지')+c('B'+r,1,'')+c('C'+r,1,'')+c('D'+r,1,'')+'</row>');merges.push('A'+r+':D'+r);r++;
+      rowsXml.push('<row r="'+r+'" ht="20" customHeight="1">'+(P.sub?c('A'+r,2,P.sub)+c('B'+r,2,'')+c('C'+r,2,'')+c('D'+r,2,''):'')+'</row>');merges.push('A'+r+':D'+r);r++;
+      for(var q=p;q<Math.min(p+3,P.rows.length);q++){
+        rowsXml.push('<row r="'+r+'" ht="8" customHeight="1"/>');r++;
+        rowsXml.push('<row r="'+r+'" ht="18" customHeight="1">'+c('A'+r,3,'No')+c('B'+r,3,P.l)+c('C'+r,3,P.r)+c('D'+r,3,'위치·내용')+'</row>');r++;
+        blockTop[q]=r;
+        for(var k=0;k<8;k++){var rr=r+k;rowsXml.push('<row r="'+rr+'" ht="24" customHeight="1">'+(k===0?c('A'+rr,4,String(q+1))+c('B'+rr,5,'')+c('C'+rr,5,'')+c('D'+rr,6,P.rows[q].t||''):c('A'+rr,4,'')+c('B'+rr,5,'')+c('C'+rr,5,'')+c('D'+rr,6,''))+'</row>');}
+        ['A','B','C','D'].forEach(function(L){merges.push(L+r+':'+L+(r+7));});
+        r+=8;
+      }
+      rowsXml.push('<row r="'+r+'" ht="8" customHeight="1"/>');r++;
+    }
+    imgs.forEach(function(im,n){var top=blockTop[im.ri]-1,col=1+im.ci;
+      anchor.push('<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>'+col+'</xdr:col><xdr:colOff>'+(M*EMU)+'</xdr:colOff><xdr:row>'+top+'</xdr:row><xdr:rowOff>'+(M*EMU)+'</xdr:rowOff></xdr:from>'+
+        '<xdr:to><xdr:col>'+col+'</xdr:col><xdr:colOff>'+((M+PH_W)*EMU)+'</xdr:colOff><xdr:row>'+(top+7)+'</xdr:row><xdr:rowOff>'+((32-M)*EMU)+'</xdr:rowOff></xdr:to>'+
+        '<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+(n+2)+'" name="사진 '+(n+1)+'"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>'+
+        '<xdr:blipFill><a:blip r:embed="rId'+(n+1)+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'+
+        '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+(PH_W*EMU)+'" cy="'+(PH_H*EMU)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>');
+      z.file('xl/media/image'+(n+1)+'.jpeg',im.b);
+    });
+    var NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet '+NS+'><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:D'+(r-1)+'"/><sheetViews><sheetView workbookViewId="0" view="pageBreakPreview" zoomScaleNormal="100"/></sheetViews><sheetFormatPr defaultRowHeight="16.5"/>'+
+      '<cols><col min="1" max="1" width="5.7109375" customWidth="1"/><col min="2" max="3" width="33.7109375" customWidth="1"/><col min="4" max="4" width="26.7109375" customWidth="1"/></cols>'+
+      '<sheetData>'+rowsXml.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.map(function(m){return '<mergeCell ref="'+m+'"/>';}).join('')+'</mergeCells>'+
+      '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>'+
+      (brk.length?'<rowBreaks count="'+brk.length+'" manualBreakCount="'+brk.length+'">'+brk.map(function(b){return '<brk id="'+b+'" max="16383" man="1"/>';}).join('')+'</rowBreaks>':'')+
+      (imgs.length?'<drawing r:id="rId1"/>':'')+'</worksheet>';
+    var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+      '<fonts count="3"><font><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font><font><b/><sz val="16"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font><font><b/><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts>'+
+      '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6E6E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF6DC"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+      '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF777777"/></left><right style="thin"><color rgb="FF777777"/></right><top style="thin"><color rgb="FF777777"/></top><bottom style="thin"><color rgb="FF777777"/></bottom><diagonal/></border></borders>'+
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7">'+
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'+
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+      '</cellXfs><cellStyles count="1"><cellStyle name="표준" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/>'+
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+      (imgs.length?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':'')+'</Types>');
+    z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    z.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook '+NS+'><sheets><sheet name="사진대지" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">사진대지!$A$1:$D$'+(r-1)+'</definedName></definedNames></workbook>');
+    z.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+    z.file('xl/styles.xml',styles);
+    z.file('xl/worksheets/sheet1.xml',sheet);
+    if(imgs.length){
+      z.file('xl/worksheets/_rels/sheet1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+      z.file('xl/drawings/drawing1.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+anchor.join('')+'</xdr:wsDr>');
+      z.file('xl/drawings/_rels/drawing1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+imgs.map(function(im,n){return '<Relationship Id="rId'+(n+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image'+(n+1)+'.jpeg"/>';}).join('')+'</Relationships>');
+    }
+    return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }).then(function(b){if(!b)return;phMark();if(msg)msg.textContent='';return saveFile(phName()+'.xlsx',b);}).catch(function(e){if(msg)msg.textContent='엑셀을 만들지 못했습니다: '+(e.message||e);});
+}
+
 /* ───────── 이벤트 ───────── */
 function onInput(e){
   var el=e.target;
+  if(gdChange(e))return;
+  if(tab==='photo'||tab==='agenda'||tab==='safety'||tab==='rules'||tab==='bid'||tab==='elect')gdSoon();
   if(el.closest&&el.closest('#spdoc')){var ce=el.closest('[data-k]');if(ce)spInput(ce);return;}
   if(el.dataset&&el.dataset.rk!==undefined){rlKeyInput(el);return;}
   if(el.dataset&&(el.dataset.sysf!==undefined||el.dataset.sysl!==undefined)){sysInputEl(el);if(el.tagName==='SELECT')sysPaint();return;}
@@ -7193,6 +7556,8 @@ function onClick(e){
   if(act.indexOf('cal')===0&&calAct(act,a))return;
   if(act.indexOf('sys')===0&&sysAct(act,a))return;
   if(act.indexOf('hm')===0&&hmAct(act,a))return;
+  if(act.indexOf('gd')===0&&gdAct(act,a))return;
+  if(act.indexOf('ph')===0&&phAct(act,a))return;
   if(act==='addag'){state.agendas.push({title:'',result:'가결',discuss:'',resolution:''});save();renderAgList();refreshPreview();var inp=$$('#aglist .ag-h input');if(inp.length)inp[inp.length-1].focus();}
   else if(act==='agdel'){state.agendas.splice(i,1);save();renderAgList();refreshPreview();}
   else if(act==='agup'&&i>0){var t=state.agendas[i];state.agendas[i]=state.agendas[i-1];state.agendas[i-1]=t;save();renderAgList();refreshPreview();}
@@ -7202,7 +7567,7 @@ function onClick(e){
   else if(act==='docx'){var kind=a.dataset.kind,d=buildDocs()[kind];makeDocx(d.blocks,d.opt).then(function(blob){return saveFile(fname(kind),blob);}).catch(function(){toast('문서를 만들지 못했습니다. 글자 복사를 이용해 주세요.');});}
   else if(act==='copydoc'){copyText(blockPlain(buildDocs()[a.dataset.kind].blocks));}
   else if(act==='copysms'){var s=$('#sms-text');copyText(s?s.value:buildDocs().sms.text);}
-  else if(act==='spdocx'){saveNow();toast('계획서를 만드는 중입니다…');spDocx().then(function(blob){return saveFile('안전관리계획서_'+state.complex.name+'.docx',blob);}).catch(function(){toast('계획서를 만들지 못했습니다. 잠시 뒤 다시 눌러 주세요.');});}
+  else if(act==='spdocx'){var _d=new Date();state.safety.savedAt=_d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');gdSoon();saveNow();toast('계획서를 만드는 중입니다…');spDocx().then(function(blob){return saveFile('안전관리계획서_'+state.complex.name+'.docx',blob);}).catch(function(){toast('계획서를 만들지 못했습니다. 잠시 뒤 다시 눌러 주세요.');});}
   else if(act==='kaptget'){kaptGet();}
   else if(act==='kaptapply'){kaptApply();}
   else if(act==='aicopy'){copyText(spPrompt(),'복사했습니다. AI 대화창에 붙여넣고 자료 파일을 같이 올리세요.');}
