@@ -72,7 +72,7 @@ main{padding-top:1.6rem}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:1.3rem;align-items:start}
 .home-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.3rem;align-items:start}
 @media (max-width:900px){.split,.home-grid{grid-template-columns:minmax(0,1fr)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:520px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}.chip{margin-left:0}}
+@media (max-width:520px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}.chip{margin-left:0}.top-in{gap:.4rem .6rem;padding:.5rem 0 .1rem}.brand small{display:none}.segl{display:none}.seg button{padding:.2rem .45rem;font-size:.74rem}.chip{font-size:.76rem;padding:.15rem .6rem;max-width:58%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}nav.tabs{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}nav.tabs button{padding:.55rem .7rem}}
 label.f{display:block;min-width:0}
 label.f>span{display:block;font-size:.8rem;color:var(--ink2);margin-bottom:.2rem}
 label.f>em{display:block;font-style:normal;font-size:.72rem;color:var(--muted);margin-top:.2rem}
@@ -270,7 +270,7 @@ textarea{resize:vertical;min-height:4.2rem;line-height:1.5}
 .ph-slot{display:block;width:100%;aspect-ratio:228/248;border:1px dashed var(--line);border-radius:.5rem;background:var(--surface2);padding:0;overflow:hidden;cursor:pointer;color:var(--muted);font:inherit;font-size:.85rem}
 .ph-slot img{width:100%;height:100%;object-fit:cover;display:block}
 .ph-txt textarea{width:100%;margin-bottom:.3rem}
-@media (max-width:640px){.gd-prep td:nth-child(2){min-width:5.5rem}.gd-prep th:first-child,.gd-prep td:first-child{padding-right:.1rem}.ph-row{grid-template-columns:1.6rem 1fr 1fr}.ph-txt{grid-column:2/4}.gd-fin li{flex-direction:column;gap:.15rem}.gd-fin li small{max-width:none;text-align:left;padding-left:1.6rem}}
+@media (max-width:640px){.gd-prep thead{display:none}.gd-prep,.gd-prep tbody,.gd-prep tr{display:block;width:100%}.gd-prep tr{border-bottom:1px solid var(--line);padding:.4rem 0}.gd-prep td{display:inline;border:0;padding:0}.gd-prep td:nth-child(2) b{margin-left:.3rem}.gd-prep td[data-l]{display:block;margin-top:.15rem;color:var(--ink2)}.gd-prep td[data-l]::before{content:attr(data-l) ' · ';color:var(--muted);font-size:.78rem}.ph-row{grid-template-columns:1.6rem 1fr 1fr}.ph-txt{grid-column:2/4}.gd-fin li{flex-direction:column;gap:.15rem}.gd-fin li small{max-width:none;text-align:left;padding-left:1.6rem}}
 </style>
 </head>
 <body>
@@ -2237,7 +2237,7 @@ var SD = (function () {
 /* ───────── 기본값 ───────── */
 var KEY='guyeon-hub-v1';
 var SP_VER='sp-2026.11-1';
-var APP_VER='1.28.0';
+var APP_VER='1.28.1';
 var DEFAULT_AUD='▣ 입주자대표회의의 회의방청에 대하여 아래와 같이 관리규약 관련 조항을 안내하여 드리오니 입주민 여러분께서 협조하여 주시기 바랍니다. 관리규약 제○○조 (회의방청)\n가. 회의를 방청하고자 하는 경우에는 관리규약 제○○조에 의거 회의시작 1일 전까지 관리주체에게 신분을 밝히고 방청신청을 하여야 합니다.\n나. 방청자는 발언할 수 없다. 다만, 의장이 안건심의와 관련하여 발언을 허가한 경우에는 그러하지 아니하다.\n다. 회의의 진행을 방해하거나 질서유지에 방해가 되는 사람은 퇴장을 명할 수 있으며, 방청자는 의장의 명에 따라야 한다.';
 function defaultState(){
   return {
@@ -5851,6 +5851,8 @@ function demoState(){
       {id:'e1',t:'수전반',k:'panel',spec:'LBS·LA·PF·MOF·VCB',fl:'B',loc:'지하 전기실',ltm:'수전반'},{id:'e2',t:'변압기',k:'tr',spec:'750kVA 몰드식 · 22.9kV → 380/220V',fl:'B',loc:'지하 전기실',ltm:'변압기'},
       {id:'e3',t:'저압반',k:'panel',fl:'B',loc:'지하 전기실',ltm:'배전반'},{id:'e4',t:'비상발전기',k:'gen',spec:'300kW',fl:'B',loc:'지하 발전기실',ltm:'발전기'},{id:'e5',t:'자동절환스위치 (ATS)',k:'valve',fl:'B',loc:'지하 전기실'},
       {id:'e6',t:'세대·공용 전기',k:'use',bd:'각 동',fl:'ALL'}],links:[{a:'e1',b:'e2'},{a:'e2',b:'e3'},{a:'e3',b:'e6'},{a:'e3',b:'e5',t:'평상시'},{a:'e4',b:'e5',t:'정전 시'}]}]}),ui:{s:'',sel:'',edit:false}};
+  s.elect=merge(electDefault(),{end:(y+1)+'-03-31',ncom:'5',rows:[{n:'제1선거구',r:'101동',u:'160',q:'1'},{n:'제2선거구',r:'102동',u:'160',q:'1'},{n:'제3선거구',r:'103동',u:'160',q:'1'}]});
+  s.bids=[merge(bidDefault(),{kind:'elev',name:'승강기 유지관리 용역',amt:'1500000',amtMode:'month',months:'24'})];s.bidCur=0;
   s.ui.setup={hide:1};s.ui.bk=t;
   return s;
 }
@@ -7196,8 +7198,8 @@ function gdSteps(id){
   if(id==='safety'){var sf=s.safety,nh=0,tot=0,ne=Object.keys(sf.edits||{}).length;SP_DOCS.forEach(function(g){g[1].forEach(function(d){tot++;if((sf.have||{})[d[0]])nh++;});});
     return [['단지 정보',has(s.complex.name)&&!/○○/.test(s.complex.name)&&has(s.complex.director)],['준비물 '+nh+'/'+tot,tot>0&&nh>=Math.ceil(tot/2)],['계획서 '+ne+'칸 고침',ne>0],['저장'+(sf.savedAt?' '+sf.savedAt.slice(5).replace('-','.'):''),has(sf.savedAt)]];}
   if(id==='rules'){var r=R(),p=r.proc;return [['현행 규약',!!r.base],['개정 조문 '+r.am.length+'개',r.am.length>0],['의결·공고일',has(p.boardDate)&&has(p.noticeDate)],['투표 결과',has(p.tYes)],['확정일',has(p.fixDate)]];}
-  if(id==='bid'){var b=BQ();return [['사업·금액',has(b.amt)],['입대의 의결일',has(b.boardDate)],['공고·마감일',has(b.noticeDate)&&has(b.dueDate)],['선정·계약',has(b.decDate)||has(b.conDate)]];}
-  if(id==='elect'){var e=EQ();return [['임기 만료일',has(e.end)],['선거구',(e.rows||[]).some(function(x){return has(x.u);})],['선출공고일',has(e.noticeDate)],['투표일',has(e.voteStart)],['임원 선출일',has(e.offDate)]];}
+  if(id==='bid'){var b=BQ();return [['사업·금액',has(b.amt)],['입대의 의결일',has(b.boardDate)],['공고·마감일',has(b.noticeDate)&&has(b.dueDate)],['선정 업체·계약',has((b.win||{}).name)||has(b.decDate)||has(b.conDate)]];}
+  if(id==='elect'){var e=EQ(),rok=(e.rows||[]).length>0&&(e.rows||[]).every(function(x){return has(x.u);});return [['임기 만료일',has(e.end)],['선거구별 세대수',rok],['선관위 정원',has(e.ncom)],['일정표 계산됨',has(e.end)&&rok],['공고 번호',has(e.noticeNo)]];}
   if(id==='photo'){var P=PQ(),np=0;P.rows.forEach(function(x){if(x.l)np++;if(x.r)np++;});return [['제목',has(P.title)],['사진 '+np+'장',np>0],['위치·내용',P.rows.length>0&&P.rows.every(function(x){return has(x.t);})],['저장'+(P.savedAt?' '+P.savedAt.slice(5).replace('-','.'):''),has(P.savedAt)]];}
   return null;
 }
@@ -7258,7 +7260,7 @@ function gdLawHtml(id){
 function gdPrepHtml(id){
   var P=GD_PREP[id];if(!P)return '';
   var g=gdLawCache(),seen=(g.seen||{})[id];
-  var tr=function(k,x){return '<tr><td><span class="tag '+(k==='필수'?'need':'opt')+'">'+k+'</span></td><td><b>'+esc(x[0])+'</b></td><td>'+esc(x[1])+'</td><td>'+esc(x[2])+'</td></tr>';};
+  var tr=function(k,x){return '<tr><td><span class="tag '+(k==='필수'?'need':'opt')+'">'+k+'</span></td><td><b>'+esc(x[0])+'</b></td><td data-l="어디서">'+esc(x[1])+'</td><td data-l="없을 시">'+esc(x[2])+'</td></tr>';};
   return '<details class="gd-box" data-gdprep="'+id+'"'+(seen?'':' open')+'><summary>시작 전 준비물 <small>필수만 있으면 끝까지 할 수 있습니다</small></summary>'+
     '<div class="tblwrap"><table class="gd-prep"><thead><tr><th>구분</th><th>준비물</th><th>어디서 구하나요</th><th>없을 시</th></tr></thead><tbody>'+
     P.need.map(function(x){return tr('필수',x);}).join('')+P.opt.map(function(x){return tr('선택',x);}).join('')+'</tbody></table></div></details>';
